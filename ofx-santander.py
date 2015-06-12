@@ -17,7 +17,11 @@ class Teste(unittest.TestCase):
         print "Entre com seu CPF:"
         self.cpf = raw_input(); 
         print "Entre com sua senha de 6 dígito (irei te roubar!): "
-        self.password = getpass.getpass()
+        if sys.stdin.isatty():
+            self.password = getpass.getpass()
+        else:
+            # caso a senha seja redirecionada
+            self.password = sys.stdin.readline().rstrip()
 
         print "Construindo o ambiente com Firefox..."
         self.myprofile = webdriver.FirefoxProfile()
