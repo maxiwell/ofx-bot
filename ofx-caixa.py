@@ -9,6 +9,7 @@ from selenium.common.exceptions import NoAlertPresentException
 from time import sleep
 import unittest, time, re
 import getpass
+import sys
 
 class Teste(unittest.TestCase):
 
