@@ -49,9 +49,9 @@ class Teste(unittest.TestCase):
 
         driver = self.driver
         driver.get(self.base_url + "/")
-        driver.switch_to_frame("iframetopo")
-        driver.find_element_by_id("txtCPF").send_keys(self.cpf)
-        driver.find_element_by_id("hrefOk").click()
+#        driver.switch_to_frame("iframebody")
+        driver.find_element_by_xpath("//input[@name='txtCPF']").send_keys(self.cpf)
+        driver.find_element_by_xpath("//input[@value='ok']").click()
 
         sleep(2)       
         driver.switch_to_frame("Principal")
