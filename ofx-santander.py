@@ -49,11 +49,14 @@ class Teste(unittest.TestCase):
 
         driver = self.driver
         driver.get(self.base_url + "/")
-#        driver.switch_to_frame("iframebody")
         driver.find_element_by_xpath("//input[@name='txtCPF']").send_keys(self.cpf)
         driver.find_element_by_xpath("//input[@value='ok']").click()
 
         sleep(2)       
+        handler = driver.window_handles[1]
+        driver.close()
+        driver.switch_to_window(handler)
+
         driver.switch_to_frame("Principal")
         driver.switch_to_frame("MainFrame")
         driver.find_element_by_css_selector("area[alt=\"Instalar mais tarde\"]").click()
