@@ -1,4 +1,6 @@
 *.swp
 *.log
 *.cfg
+*~
+/ofx-itau
 
