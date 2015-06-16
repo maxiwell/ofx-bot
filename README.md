@@ -21,16 +21,16 @@ Caixa Econômica, Itaú e Santander com aplicativos que aceitam o formato 'ofx' 
 Requisitos:
 --------------
 
-* ofx-bb, ofx-caixa e ofx-santander
-É necessário ter o pacote **selenium** do Python2:
+#### ofx-bb, ofx-caixa e ofx-santander
+* É necessário ter o pacote **selenium** do Python2:
 
 ```bash
 pip2 install selenium
 ```
 
-* ofx-itau
+#### ofx-itau
 
-É necessário possuir um **haskell-platform** e um **cabal** recente em funcionamento.
+* É necessário possuir um **haskell-platform** e um **cabal** recente em funcionamento.
 
 ```bash
 apt-get install haskell-platform cabal-install
@@ -38,15 +38,15 @@ cabal update
 cabal install cabal
 ```
 
-A última linha garante que você tenha a última versão do cabal instalada. Algumas distribuições ainda vêm com uma versão bem antiga.
+* A última linha garante que você tenha a última versão do cabal instalada. Algumas distribuições ainda vêm com uma versão bem antiga.
 
-Para compilar:
+* Para compilar:
 
 ```bash
 cd itau
 ./build.sh
 ```
-Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau é automaticamente copiado para o diretório raiz do projeto.
+* Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau é automaticamente copiado para o diretório raiz do projeto.
 
 
 Como usar:
@@ -57,6 +57,7 @@ Como usar:
 ./ofx-caixa.py
 ./ofx-itau
 ./ofx-santander.py
+
 ou
 
 ./ofx-bb.py < input.cfg
