@@ -53,10 +53,13 @@ class Teste(unittest.TestCase):
         driver.find_element_by_xpath("//input[@value='ok']").click()
 
         sleep(2)       
-        handler = driver.window_handles[1]
-        driver.close()
-        driver.switch_to_window(handler)
-
+        try:
+            handler = driver.window_handles[1]
+            driver.close()
+            driver.switch_to_window(handler)
+        except:
+            print "Versao com uma janela" 
+            
         driver.switch_to_frame("Principal")
         driver.switch_to_frame("MainFrame")
         driver.find_element_by_css_selector("area[alt=\"Instalar mais tarde\"]").click()
