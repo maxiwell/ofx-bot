@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Concurrent
-import Control.Exception.Base
+import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
@@ -18,6 +18,7 @@ import Network.HTTP
 import Network.URI (parseURI)
 import System.Directory
 import System.Environment.Executable
+import System.IO
 import System.Process
 import Test.WebDriver
 import qualified Test.WebDriver.Class as WD
@@ -25,10 +26,14 @@ import Test.WebDriver.Firefox.Profile
 import Test.WebDriver.Commands.Wait
 import Text.Printf
 
-
 sleep :: Int -> IO()
 sleep msecs =
     threadDelay $ msecs * 1000
+
+withEcho :: Bool -> IO a -> IO a
+withEcho echo action = do
+    old <- hGetEcho stdin
+    bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
 
 comb :: Int -> [a] -> [[a]]
 comb m xs = combsBySize xs !! m
@@ -57,7 +62,6 @@ findPasswordButtons' (d:ds) found = do
     where
         fElems x = findElems $ ByCSS (pack $ "img[title=\"" ++ x ++ "\"]")
 
--- login :: Text -> Text -> Text -> String -> IO ()
 login :: (WD.WebDriver m, MonadIO m) => String -> String -> String -> [Char] -> m ()
 login agencia conta nome senha = do
     openPage "http://www.itau.com.br"
@@ -94,23 +98,22 @@ getOFX :: WD()
 getOFX = do
     findElem (ByLinkText "Conta Corrente") >>= click
     findElem (ByLinkText "Extrato") >>= click
-    -- liftIO $ print "Aguardando 5"
-    -- liftIO $ sleep 5000
     waitUntil 30 $ findElem (ByLinkText "Salvar em outros formatos") >>= click
     (year, month, day) <- liftIO $ getOFXStartDate
+    liftIO $ sleep 1000 -- Apesar da página completa, um script passa zerando os valores dos campos se formos muito rápido
     waitUntil 30 $ findElem (ById "Dia") >>= sendKeys day
     waitUntil 30 $ findElem (ById "Mes") >>= sendKeys month
     waitUntil 30 $ findElem (ById "Ano") >>= sendKeys year
     waitUntil 30 $ findElem (ByCSS "input[value=\"OFX\"]") >>= click
     waitUntil 30 $ findElem (ByCSS "img.TRNinputBTN") >>= click
-    liftIO $ sleep 5000 -- wait a few seconds to ensure the download has finished
+    liftIO $ sleep 5000 -- aguarda alguns segundos pra que o download tenha acabado
 
 
 logout :: WD()
 logout = do
     findElem (ByCSS "img.btnSair") >>= click
     findElem (ByCSS "img[alt=\"Sair\"]") >>= click
-    liftIO $ sleep 5000 -- Wait a few seconds to make sure the logout was done
+    liftIO $ sleep 5000 -- Aguarda alguns segundos para ter certeza que o logout terminou
 
 myProfile :: IO (PreparedProfile Firefox)
 myProfile =
@@ -146,10 +149,10 @@ checkAndDownloadSelenium :: FilePath -> IO ()
 checkAndDownloadSelenium fname = do
         fExists <- doesFileExist fname
         when (not fExists) $ do
-            putStrLn "Selenium server file not found. Downloading..."
+            putStrLn "Selenium server não encontrado. Iniciando download..."
             bytes <- simpleHTTP (defaultGETRequest_ url) >>= getResponseBody
             B.writeFile fname bytes
-            putStrLn "Download finished."
+            putStrLn "Download terminado"
     where
         (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.46/selenium-server-standalone-2.46.0.jar"
 
@@ -158,10 +161,10 @@ startSeleniumServer = do
         (path, _) <- splitExecutablePath
         let fname = fullFilePath path
         checkAndDownloadSelenium fname
-        (_, _, Just stderr, _) <- createProcess (shell $ "java -jar " ++ fname){std_out = CreatePipe, std_err = CreatePipe}
-        waitStart stderr
+        (_, _, Just st_err, _) <- createProcess (shell $ "java -jar " ++ fname){std_out = CreatePipe, std_err = CreatePipe}
+        waitStart st_err
     where
-        -- hardcoded, for the time being, to the version 2.46
+        -- hardcoded, por enquanto, com a versão 2.46
         bname = "selenium-server-standalone-2.46.0.jar"
         fullFilePath path = path ++ bname
         waitStart fstream = do
@@ -177,16 +180,21 @@ stopSeleniumServer = do
 
 main :: IO()
 main = do
-    putStrLn "Agência: "
+    putStr "Agência: "
+    hFlush stdout
     agencia <- getLine
-    putStrLn "Conta Corrente: "
+    putStr "Conta Corrente: "
+    hFlush stdout
     conta <- getLine
-    putStrLn "Primeiro nome: "
+    putStr "Primeiro nome: "
+    hFlush stdout
     nome <- getLine
-    putStrLn "Senha: "
-    senha <- getLine
+    putStr "Senha: "
+    hFlush stdout
+    senha <- withEcho False getLine
+    putChar '\n'
 
-    putStrLn "Starting Selenium Server"
+    putStrLn "Iniciando Selenium Server"
     startSeleniumServer
     config <- myConfig
     runSession config $ do
@@ -199,5 +207,5 @@ main = do
         logout
         liftIO $ putStrLn "Fechando sessão Selenium"
         closeSession
-    putStrLn "Stopping Selenium Server"
+    putStrLn "Desligando Selenium Server"
     stopSeleniumServer
