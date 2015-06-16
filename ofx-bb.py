@@ -61,7 +61,11 @@ class Teste(unittest.TestCase):
         driver.find_element_by_id("senhaConta").send_keys(self.password)
         driver.find_element_by_id("botaoEntrar").click()
 
-        
+        # Resolvendo janela de codigo
+        try:
+            driver.find_element_by_xpath("//a[@title='Fechar']").click()
+        except: pass 
+
         print "Acessando a Conta Corrente..."
 
         # Baixar OFX da Conta Corrente
