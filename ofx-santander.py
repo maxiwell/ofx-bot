@@ -10,6 +10,7 @@ from time import sleep
 import unittest, time, re
 import getpass
 import sys
+import os
 
 class Teste(unittest.TestCase):
 
@@ -27,7 +28,8 @@ class Teste(unittest.TestCase):
         print "Construindo o ambiente com Firefox..."
         self.myprofile = webdriver.FirefoxProfile()
         self.myprofile.set_preference('plugin.state.java', 2)
-        self.myprofile.set_preference('browser.download.folderList', 0)
+        self.myprofile.set_preference('browser.download.folderList', 2)
+        self.myprofile.set_preference('browser.download.dir', os.getcwd())
         self.myprofile.set_preference('browser.download.manager.showWhenStarting', False)
         self.myprofile.set_preference('browser.download.manager.focusWhenStarting', False)
         self.myprofile.set_preference('browser.download.useDownloadDir', True)
