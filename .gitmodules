@@ -1,0 +1,3 @@
+[submodule "itau/itau-lib"]
+	path = itau/itau-lib
+	url = https://github.com/francesquini/itau-lib.git
