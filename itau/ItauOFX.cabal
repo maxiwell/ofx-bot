@@ -11,7 +11,7 @@ cabal-version:       >=1.10
 executable ofx-itau
   main-is:             Main.hs
   build-depends:       base >=4.7,
-                       itau-lib >=0.1,
+                       itau-lib >=0.2.0.1,
                        webdriver >= 0.6,
                        transformers >= 0.3,
                        directory >= 1.2
