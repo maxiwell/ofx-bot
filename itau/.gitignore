@@ -1,3 +1,4 @@
 /.cabal-sandbox/
 /dist/
 *.sandbox.config
+.tags
