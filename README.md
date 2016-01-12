@@ -17,7 +17,7 @@ Caixa Econômica, Itaú e Santander com aplicativos que aceitam o formato 'ofx' 
 #### ofx-santander:
 * Baixa o 'ofx' da conta corrente
 
-#### csv-nubank
+#### csv-nubank:
 * Baixa o 'csv' dos lançamentos da fatura atual
 
 
