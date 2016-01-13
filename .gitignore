@@ -2,5 +2,8 @@
 *.log
 *.cfg
 *~
-/ofx-itau
+ofx-itau
 .tags
+selenium-server-standalone-2.46.0.jar
+csv-nubank
+

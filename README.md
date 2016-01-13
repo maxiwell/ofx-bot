@@ -17,6 +17,9 @@ Caixa Econômica, Itaú e Santander com aplicativos que aceitam o formato 'ofx' 
 #### ofx-santander:
 * Baixa o 'ofx' da conta corrente
 
+#### csv-nubank:
+* Baixa o 'csv' dos lançamentos da fatura atual
+
 
 Requisitos:
 --------------
@@ -28,7 +31,7 @@ Requisitos:
 pip2 install selenium
 ```
 
-#### ofx-itau
+#### ofx-itau, csv-nubank
 
 * É necessário possuir um **haskell-platform** e um **cabal** recente em funcionamento.
 
@@ -46,7 +49,14 @@ cabal install cabal
 cd itau
 ./build.sh
 ```
-* Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau é automaticamente copiado para o diretório raiz do projeto.
+ou 
+
+```bash
+cd nubank
+./build.sh
+```
+
+* Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau/csv-nubank é automaticamente copiado para o diretório raiz do projeto.
 
 
 Como usar:
@@ -57,6 +67,7 @@ Como usar:
 ./ofx-caixa.py
 ./ofx-itau
 ./ofx-santander.py
+./csv-nubank
 
 ou
 
@@ -64,6 +75,7 @@ ou
 ./ofx-caixa.py < input.cfg
 ./ofx-itau < input.cfg
 ./ofx-santander.py < input.cfg
+./csv-nubank < input.cfg
 ```
 
 Notas:
