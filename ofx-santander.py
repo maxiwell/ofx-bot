@@ -54,30 +54,33 @@ class Teste(unittest.TestCase):
         driver.find_element_by_xpath("//input[@name='txtCPF']").send_keys(self.cpf)
         driver.find_element_by_xpath("//input[@value='ok']").click()
 
-        sleep(2)       
+#        sleep(2)       
         try:
             handler = driver.window_handles[1]
             driver.close()
             driver.switch_to_window(handler)
         except:
             print "Versao com uma janela" 
-            
-        driver.switch_to_frame("Principal")
-        driver.switch_to_frame("MainFrame")
-        driver.find_element_by_css_selector("area[alt=\"Instalar mais tarde\"]").click()
+        
+        try:
+            driver.switch_to_frame("Principal")
+            driver.switch_to_frame("MainFrame")
+            driver.find_element_by_css_selector("area[alt=\"Instalar mais tarde\"]").click()
+        except: 
+            print "Frame \"Instalar mais tarde\" não encontrado"
 
-        sleep(2) 
+#        sleep(2) 
         driver.find_element_by_id("txtSenha").clear()
         driver.find_element_by_id("txtSenha").send_keys(self.password)
         driver.find_element_by_link_text("continuar").click()
 
-        sleep(2)
+#        sleep(2)
         driver.switch_to_default_content()
         driver.switch_to_frame("Principal")
         driver.switch_to_frame("Menu")
         driver.find_element_by_partial_link_text("Corrente").click()
 
-        sleep(2)
+#        sleep(2)
         driver.switch_to_default_content()
         driver.switch_to_frame("Principal")
         driver.switch_to_frame("Corpo")
@@ -88,7 +91,6 @@ class Teste(unittest.TestCase):
         driver.find_element_by_link_text(u"exportar").click()
         driver.find_element_by_id("tipo3").click()
         driver.find_element_by_link_text("confirmar").click()
-
         sleep(5)
 
 

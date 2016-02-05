@@ -72,36 +72,30 @@ class Teste(unittest.TestCase):
 
         # Baixar OFX da Conta Corrente
         driver.find_element_by_css_selector("li.saldo-texto").click()
-        sleep(4)
+#        sleep(2)
         driver.find_element_by_partial_link_text("30 dias").click()
-        sleep(4)
+#        sleep(2)
 
         print "Baixando o OFX da Conta Corrente..."
  
         driver.find_element_by_css_selector("a.botaoToolBar.botaoToolBarSalvar").click()
         driver.find_element_by_link_text("Money 2000+ (ofx)").click()
-        sleep(5)
+#        sleep(2)
 
         print "Acessando o Cartao de Credito..."
 
         # Baixar OFX do Cartao Petrobras
         driver.find_element_by_xpath(u"//a[@nome='Cartões']").click()
-        for i in range(60):
-            try:
-                if self.is_element_present(By.XPATH, "//a[@codigo='3580']"): break
-            except: pass
-            time.sleep(1)
-        else: self.fail("time out")
         driver.find_element_by_xpath("//a[@codigo='3580']").click()
         driver.find_element_by_xpath("//img[@title='PETROBRAS']").click()
         print "Baixando o OFX do Cartao de Credito..."
 
-        sleep(8)
+        sleep(2)
         driver.find_element_by_xpath("//a[@onclick='$.criarCaixaDialogoSalvarFatura(this,event);']").click()
         driver.find_element_by_link_text("Money 2000+ (ofx)").click()
 
         print "Roubando seu dinheiro..."
-        sleep(3)
+        sleep(4)
 
     def is_element_present(self, how, what):
         try: self.driver.find_element(by=how, value=what)
