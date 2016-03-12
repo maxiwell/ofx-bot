@@ -68,14 +68,24 @@ Como usar:
 ./ofx-itau
 ./ofx-santander.py
 ./csv-nubank
+```
+Ou usando um aquivo de entrada, via redirecionamento:
 
-ou
-
+```bash
 ./ofx-bb.py < input.cfg
 ./ofx-caixa.py < input.cfg
 ./ofx-itau < input.cfg
 ./ofx-santander.py < input.cfg
 ./csv-nubank < input.cfg
+```
+
+Nos casos acima, a janela do Firefox ficará visível durante toda a execução dos bots, pois não há 
+nenhum tratamento com o display. Este comportamento é interessante para acompanhar o movimento 
+nas páginas e depurar possíveis bugs. Para deixar o browser oculto, utilize um display virtual,
+como no exemplo abaixo:
+
+```bash
+xvfb-run --server-args="-screen 0, 1440x900x24" ./ofx-bb.py < input.cfg
 ```
 
 Notas:
