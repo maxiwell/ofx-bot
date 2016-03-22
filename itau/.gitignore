@@ -2,3 +2,4 @@
 /dist/
 *.sandbox.config
 .tags
+.stack-work
