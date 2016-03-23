@@ -22,7 +22,8 @@ executable csv-nubank
                         time >=1.4,
                         transformers >=0.3,
                         tuple >= 0.3, 
-                        webdriver >= 0.6
+                        webdriver >= 0.6,
+                        regex-compat >=0.95
 
   ghc-options:         -O3 -Wall
   default-language:    Haskell2010
