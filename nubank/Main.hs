@@ -5,10 +5,11 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString as B
+import qualified Data.Foldable as F
 import           Data.List
 import           Data.Maybe
-import           Data.Text (pack, unpack)
-import qualified Data.Text.IO as T
+import qualified Data.Text as T
+import qualified Data.Text.IO as Tio
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Time.LocalTime
@@ -25,6 +26,10 @@ import           Test.WebDriver
 import           Test.WebDriver.Firefox.Profile
 import           Test.WebDriver.Commands.Wait
 import           Text.Printf
+import           Text.Regex
+
+isBlank :: T.Text -> Bool
+isBlank = T.null . T.strip
 
 data Tx = Tx {
     txData      :: String,
@@ -33,10 +38,8 @@ data Tx = Tx {
     txFatura    :: String
 } deriving Show
 
-data Fatura = Fatura {
-    fatVencimento :: String,
-    fatTxs        :: [Tx]
-} deriving Show 
+fmt3 :: Int -> String
+fmt3 = printf "%03d"
 
 sleep :: Int -> IO()
 sleep msecs =
@@ -59,8 +62,8 @@ login :: String -> String -> WD ()
 login cpf senha = do
     openPage "http://www.nubank.com.br"
     wait $ findElem (ByLinkText "Login") >>= click
-    wait $ findElem (ById "username") >>= sendKeys (pack cpf)
-    wait $ findElem (ById "input_001")   >>= sendKeys (pack senha) --senha
+    wait $ findElem (ById "username") >>= sendKeys (T.pack cpf)
+    wait $ findElem (ById "input_001")   >>= sendKeys (T.pack senha) --senha
     wait $ findElem (ByXPath "//button[@type='submit']") >>= click
 
 logout :: WD()
@@ -75,33 +78,52 @@ converteMes m =
         meses = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
     
 converteData :: String -> WD String
+converteData "" = return ""
 converteData str = do
     hj <- liftIO today
     return (show (sel1 (toGregorian hj)) ++ "-" ++ fmt2 (converteMes m) ++ "-" ++ fmt2 (read d :: Int))
     where
-        [d, m] = words str 
+        [d, m] = words str
         fmt2 = printf "%02d"
+
+converteValor :: T.Text -> Float
+converteValor val =
+        if '-' `elem` T.unpack val
+            then negate num
+            else num
+    where
+        el = (`F.elem`  (",0123456789":: String))
+        num = read . T.unpack . T.replace "," "." $ T.filter el val
+    
+
+isValidTx :: Tx -> Bool
+isValidTx (Tx "" _ _ _) = False
+isValidTx (Tx _ "" _ _) = False
+isValidTx (Tx _ _ "" _) = False
+isValidTx _             = True
 
 txToCSV :: Tx -> String
 txToCSV tx = 
     intercalate ";" linha
     where 
-    linha = [txData tx, "", "Fat Vcto " ++ txFatura tx, "", txDescricao tx, txValor tx, "", ""]
+    linha = [txData tx, "", txFatura tx, "", txDescricao tx, txValor tx, "", ""]
 
-faturaToCSV :: Fatura -> String
-faturaToCSV fat = 
-    unlines $ map txToCSV (fatTxs fat)
+faturaToCSV :: [Tx] -> String
+faturaToCSV txs = 
+    unlines $ map txToCSV $ filter isValidTx txs
 
 getTx :: String -> Element -> WD Tx
 getTx fat ele = do
     dt0  <- wait $ findElemFrom ele (ByCSS "span.date.ng-binding") >>= getText
-    dt   <- converteData $ unpack dt0 
-    desc <- wait $findElemFrom ele (ByCSS "div.description.ng-binding") >>= getText
+    dtc   <- converteData $ T.unpack dt0 
+    desc <- wait $ findElemFrom ele (ByCSS "div.description.ng-binding") >>= getText
     val  <- wait $ findElemFrom ele (ByCSS "div.amount.ng-binding") >>= getText
     return Tx {     
-        txData      = dt,
-        txDescricao = unpack desc,
-        txValor     = unpack val,
+        txData      = dtc,
+        txDescricao = T.unpack desc,
+        txValor     = if isBlank val
+            then ""
+            else show $ negate $ converteValor val,
         txFatura    = fat    
     }
 
@@ -110,23 +132,42 @@ getTxs venc = do
     tableLines <- wait $ findElems (ByCSS "div.charge.ng-scope")
     mapM (getTx venc) tableLines
 
-getFaturaIx :: String -> WD Fatura
-getFaturaIx _ix = do
+getVencimento :: WD String 
+getVencimento = do 
+    -- A caixa com o Vencimento troca de nome e de classe e de caminho dependendo 
+    -- da aba selecionada. Então, mato o mosquito com tiro de canhão, pego a 
+    -- bagaça toda e taco a regex nela
+    venc1 <- wait $ findElem (ByClass "bills-browser") >>= getText
+    let vencFull = T.unpack venc1
+    return $ case matchRegex regex vencFull of
+        Nothing -> ""
+        Just ~[venc] -> "Venc. " ++ venc
+    where
+        regex = mkRegex "Vencimento.+([0-9][0-9]+....)"
+
+getFaturaIx :: Element -> WD [Tx]
+getFaturaIx el = do
+    wait $ click el
+    liftIO $ sleep 1500
+    getVencimento >>= getTxs
+    
+
+getFaturaIxs :: Int -> [Element] -> WD [Element]
+getFaturaIxs ix acc = do
+    elems <- findElems (ByCSS $ T.pack $ "#tab_" ++ fmt3 ix)
+    case elems of
+        []   -> return acc
+        [el] -> getFaturaIxs (ix + 1) (el:acc)
+        _    -> error "should not be here"
+    
+
+getFatura :: WD [Tx]
+getFatura = do
     wait $ findElem (ByCSS "a.menu-item.bills") >>= click -- Menu Faturas
     liftIO $ sleep 5000
-    --por enquanto apenas a fatura atual
-    qdrEsq <- wait $ findElem (ByCSS "div.amount-due")
-    venc0  <- wait $ findElemFrom qdrEsq (ByCSS "span.date.ng-binding") >>= getText
-    venc   <- converteData $ unpack venc0
-    txs    <- getTxs venc
-    return Fatura {
-        fatVencimento = venc,
-        fatTxs = txs        
-    }        
-    
-getFatura :: WD Fatura
-getFatura =
-    getFaturaIx ""
+    elems <- getFaturaIxs 2 []
+    txs <- mapM getFaturaIx elems
+    return $ concat txs
 
 myProfile :: String -> IO (PreparedProfile Firefox)
 myProfile dir =
@@ -211,8 +252,8 @@ main = do
         login cpf senha
         liftIO $ putStrLn "Pegando CSV"
         fatura <- getFatura
-        let fname = "nubank_venc_" ++ fatVencimento fatura ++ ".csv" 
-        liftIO $ T.writeFile (combine dir fname) (pack $ faturaToCSV fatura)
+        let fname = "nubank_" ++ cpf ++ ".csv"
+        liftIO $ Tio.writeFile (combine dir fname) (T.pack $ faturaToCSV fatura)
         liftIO $ putStrLn "Deslogando"
         logout
         liftIO $ putStrLn "Fechando sessão Selenium"
