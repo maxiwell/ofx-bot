@@ -128,7 +128,7 @@ class Teste(unittest.TestCase):
 
     def wait_and_find_element(self, by):
         delay = 30  # sec
-        WebDriverWait(self.driver, delay).until(EC.presence_of_element_located(by))
+        WebDriverWait(self.driver, delay).until(EC.visibility_of_element_located(by))
         return self.driver.find_element(*by)
 
 if __name__ == "__main__":
