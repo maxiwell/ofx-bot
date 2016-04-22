@@ -8,6 +8,7 @@ import qualified Data.ByteString as B
 import qualified Data.Foldable as F
 import           Data.List
 import           Data.Maybe
+import           Data.Char
 import qualified Data.Text as T
 import qualified Data.Text.IO as Tio
 import           Data.Time.Calendar
@@ -19,6 +20,7 @@ import           Network.HTTP
 import           Network.URI (parseURI)
 import           System.Directory
 import           System.FilePath
+import           System.Environment  
 import           System.Environment.Executable
 import           System.IO
 import           System.Process
@@ -27,19 +29,50 @@ import           Test.WebDriver.Firefox.Profile
 import           Test.WebDriver.Commands.Wait
 import           Text.Printf
 import           Text.Regex
+import           System.Console.GetOpt
 
-isBlank :: T.Text -> Bool
-isBlank = T.null . T.strip
+data Flag = OFX 
+          | CSV
+          | Help
+    deriving (Eq, Show)
+          
+options :: [OptDescr Flag]
+options =
+  [ Option ['o'] ["ofx", "OFX"] (NoArg OFX) 
+        "Baixa as transações e salva no formato OFX (DEFAULT caso nenhuma opção seja especificada)"
+  , Option ['c'] ["csv", "CSV"] (NoArg CSV) 
+        "Baixa as transações e salva no formato CSV compatível com HomeBank"
+  , Option ['h'] ["help"] (NoArg Help)
+        "Imprime as opções do programa"
+  ]
+
+usageString :: String
+usageString = 
+        usageInfo header options
+    where 
+        header = "Uso: ofx-nubank -op1 --long-op2\nEx: ofx-nubank --OFX -c\n"
+  
+getOpts :: [String] -> IO ([Flag], [String])
+getOpts argv = 
+    case getOpt Permute options argv of
+        (o,n,[]  ) -> return (o,n)
+        (_,_,errs) -> ioError (userError (concat errs ++ usageString))
 
 data Tx = Tx {
-    txData      :: String,
+    txData      :: Maybe Day,
     txDescricao :: String,
-    txValor     :: String,
+    txValor     :: Float,
     txFatura    :: String
 } deriving Show
 
-fmt3 :: Int -> String
-fmt3 = printf "%03d"
+fmtInt2 :: Int -> String
+fmtInt2 = printf "%02d"
+
+fmtInt3 :: Int -> String
+fmtInt3 = printf "%03d"
+
+fmtDouble2 :: Float -> String
+fmtDouble2 = printf "%.2g"
 
 sleep :: Int -> IO()
 sleep msecs =
@@ -77,14 +110,13 @@ converteMes m =
     where
         meses = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
     
-converteData :: String -> WD String
-converteData "" = return ""
+converteData :: String -> WD (Maybe Day)
+converteData "" = return Nothing
 converteData str = do
     hj <- liftIO today
-    return (show (sel1 (toGregorian hj)) ++ "-" ++ fmt2 (converteMes m) ++ "-" ++ fmt2 (read d :: Int))
+    return $ Just $ fromGregorian (sel1 $ toGregorian hj) (converteMes m) (read d)
     where
         [d, m] = words str
-        fmt2 = printf "%02d"
 
 converteValor :: T.Text -> Float
 converteValor val =
@@ -94,23 +126,108 @@ converteValor val =
     where
         el = (`F.elem`  (",0123456789":: String))
         num = read . T.unpack . T.replace "," "." $ T.filter el val
-    
 
 isValidTx :: Tx -> Bool
-isValidTx (Tx "" _ _ _) = False
-isValidTx (Tx _ "" _ _) = False
-isValidTx (Tx _ _ "" _) = False
-isValidTx _             = True
+isValidTx (Tx Nothing _  _  _) = False
+isValidTx (Tx _       "" _  _) = False
+isValidTx _                    = True
+
+showDDMMYY :: Day -> String
+showDDMMYY dt = 
+        intercalate "-" [fmtInt2 d, fmtInt2 m, fmtInt2 . fromIntegral $ y `mod` 100]
+    where
+        (y,m,d) = toGregorian dt
+        
 
 txToCSV :: Tx -> String
 txToCSV tx = 
     intercalate ";" linha
     where 
-    linha = [txData tx, "", txFatura tx, "", txDescricao tx, txValor tx, "", ""]
+    linha = [
+        showDDMMYY $ fromJust (txData tx), 
+        "", 
+        txFatura tx, 
+        "", 
+        txDescricao tx, 
+        fmtDouble2 $ txValor tx, 
+        "", 
+        ""]
 
-faturaToCSV :: [Tx] -> String
+faturaToCSV :: [Tx] -> T.Text
 faturaToCSV txs = 
-    unlines $ map txToCSV $ filter isValidTx txs
+    T.pack $ unlines $ map txToCSV txs
+    
+txToOFX :: Tx -> String
+txToOFX tx = 
+    intercalate "\n" [ 
+          "<STMTTRN>"
+        , "<TRNTYPE>" ++ (if txValor tx < 0 then "DEBIT" else "CREDIT")
+        , "<DTPOSTED>" ++ dt
+        , "<TRNAMT>" ++ fmtDouble2 (txValor tx)
+        , "<FITID>" ++ txFatura tx
+        , "<CHECKNUM>" ++ txFatura tx
+        , "<MEMO>" ++ txDescricao tx
+        , "</STMTTRN>"]
+    where
+        dt = filter isDigit (showGregorian $ fromJust (txData tx)) ++ "100000[-03:EST]"
+
+faturaToOFX :: [Tx] -> Day -> String -> T.Text
+faturaToOFX txs hj loginName = 
+        T.pack $ header ++ unlines (map txToOFX txs) ++ footer
+    where
+        hjg = toGregorian hj
+        y = sel1  hjg
+        dt = show y ++ fmtInt2 (sel2 hjg) ++ fmtInt2 (sel3 hjg) ++  "100000[-03:EST]"
+        header = unlines
+            [   "OFXHEADER:100"
+              , "DATA:OFXSGML"
+              , "VERSION:102"
+              , "SECURITY:NONE"
+              , "ENCODING:USASCII"
+              , "CHARSET:1252"
+              , "COMPRESSION:NONE"
+              , "OLDFILEUID:NONE"
+              , "NEWFILEUID:NONE"
+              , ""
+              , "<OFX>"
+              , "<SIGNONMSGSRSV1>"
+              , "<SONRS>"
+              , "<STATUS>"
+              , "<CODE>0"
+              , "<SEVERITY>INFO"
+              , "</STATUS>"
+              , "<DTSERVER>" ++ dt
+              , "<LANGUAGE>POR"
+              , "</SONRS>"
+              , "</SIGNONMSGSRSV1>"
+              , "<BANKMSGSRSV1>"
+              , "<STMTTRNRS>"
+              , "<TRNUID>1001"
+              , "<STATUS>"
+              , "<CODE>0"
+              , "<SEVERITY>INFO"
+              , "</STATUS>"
+              , "<STMTRS>"
+              , "<CURDEF>BRL"
+              , "<BANKACCTFROM>"
+              , "<BANKID>0000"
+              , "<ACCTID>NUBANK_" ++ loginName 
+              , "<ACCTTYPE>CHECKING"
+              , "</BANKACCTFROM>"
+              , "<BANKTRANLIST>"
+            ]
+        footer = unlines [
+              "</BANKTRANLIST>"
+            , "<LEDGERBAL>"
+            , "<BALAMT>0.00"
+            , "<DTASOF>" ++ dt
+            , "</LEDGERBAL>"
+            , "</STMTRS>"
+            , "</STMTTRNRS>"
+            , "</BANKMSGSRSV1>"
+            , "</OFX>"
+            ]                      
+
 
 getTx :: String -> Element -> WD Tx
 getTx fat ele = do
@@ -121,9 +238,7 @@ getTx fat ele = do
     return Tx {     
         txData      = dtc,
         txDescricao = T.unpack desc,
-        txValor     = if isBlank val
-            then ""
-            else show $ negate $ converteValor val,
+        txValor     = negate $ converteValor val,
         txFatura    = fat    
     }
 
@@ -154,7 +269,7 @@ getFaturaIx el = do
 
 getFaturaIxs :: Int -> [Element] -> WD [Element]
 getFaturaIxs ix acc = do
-    elems <- findElems (ByCSS $ T.pack $ "#tab_" ++ fmt3 ix)
+    elems <- findElems (ByCSS $ T.pack $ "#tab_" ++ fmtInt3 ix)
     case elems of
         []   -> return acc
         [el] -> getFaturaIxs (ix + 1) (el:acc)
@@ -232,31 +347,54 @@ stopSeleniumServer = do
     where
         (Just url) = parseURI "http://localhost:4444/selenium-server/driver/?cmd=shutDownSeleniumServer"
 
+generateCSV :: String -> FilePath -> [Tx] -> IO()
+generateCSV cpf dir fatura =
+    let fname = "nubank_" ++ cpf ++ ".csv" in do
+        putStrLn "Pegando CSV"
+        Tio.writeFile (combine dir fname) (faturaToCSV fatura)
+
+generateOFX :: String -> FilePath -> [Tx] -> IO()
+generateOFX cpf dir fatura =
+    let fname = "nubank_" ++ cpf ++ ".ofx" in do
+        putStrLn "Pegando OFX"
+        hj <- today
+        Tio.writeFile (combine dir fname)  (faturaToOFX fatura hj cpf)
+
 main :: IO()
 main = do
-    putStr "CPF: "
-    hFlush stdout
-    cpf <- getLine
-    putStr "Senha: "
-    hFlush stdout
-    senha <- withEcho False getLine
-    putChar '\n'
+    args <- getArgs
+    (flags, _) <- getOpts args
+    
+    if Help `elem`flags || (length args /= length flags) then
+        putStrLn usageString
+    else do
+        putStr "CPF: "
+        hFlush stdout
+        cpf <- getLine
+        putStr "Senha: "
+        hFlush stdout
+        senha <- withEcho False getLine
+        putChar '\n'
 
-    putStrLn "Iniciando Selenium Server"
-    startSeleniumServer
-    dir <- getCurrentDirectory
-    config <- myConfig dir
-    runSession config $ do
-        setImplicitWait 200
-        liftIO $ putStrLn "Efetuando login"
-        login cpf senha
-        liftIO $ putStrLn "Pegando CSV"
-        fatura <- getFatura
-        let fname = "nubank_" ++ cpf ++ ".csv"
-        liftIO $ Tio.writeFile (combine dir fname) (T.pack $ faturaToCSV fatura)
-        liftIO $ putStrLn "Deslogando"
-        logout
-        liftIO $ putStrLn "Fechando sessão Selenium"
-        closeSession
-    putStrLn "Desligando Selenium Server"
-    stopSeleniumServer
+        putStrLn "Iniciando Selenium Server"
+        startSeleniumServer
+        dir <- getCurrentDirectory
+        config <- myConfig dir
+        runSession config $ do
+            setImplicitWait 200
+            liftIO $ putStrLn "Efetuando login"
+            login cpf senha
+            f0 <- getFatura
+            let fatura = filter isValidTx f0
+            
+            when (CSV `elem` flags) $ 
+                liftIO (generateCSV cpf dir fatura)
+            when (null flags || OFX `elem` flags) $ 
+                liftIO (generateOFX cpf dir fatura)
+                    
+            liftIO $ putStrLn "Deslogando"
+            logout
+            liftIO $ putStrLn "Fechando sessão Selenium"
+            closeSession
+        putStrLn "Desligando Selenium Server"
+        stopSeleniumServer
