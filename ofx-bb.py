@@ -4,8 +4,11 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import NoAlertPresentException
+
 from time import sleep
 import unittest, time, re
 import getpass
@@ -72,27 +75,28 @@ class Teste(unittest.TestCase):
 
         # Baixar OFX da Conta Corrente
         driver.find_element_by_css_selector("li.saldo-texto").click()
-#        sleep(2)
         driver.find_element_by_partial_link_text("30 dias").click()
-#        sleep(2)
-
-        print "Baixando o OFX da Conta Corrente..."
- 
         driver.find_element_by_css_selector("a.botaoToolBar.botaoToolBarSalvar").click()
         driver.find_element_by_link_text("Money 2000+ (ofx)").click()
-#        sleep(2)
 
         print "Acessando o Cartao de Credito..."
 
         # Baixar OFX do Cartao Petrobras
-        driver.find_element_by_xpath(u"//a[@nome='Cartões']").click()
-        driver.find_element_by_xpath("//a[@codigo='3580']").click()
-        driver.find_element_by_xpath("//img[@title='PETROBRAS']").click()
-        print "Baixando o OFX do Cartao de Credito..."
-
+        self.wait_and_find_element((By.XPATH,u"//a[@nome='Cartões']")).click()
+        self.wait_and_find_element((By.XPATH,"//a[@codigo='3580']")).click()
         sleep(2)
-        driver.find_element_by_xpath("//a[@onclick='$.criarCaixaDialogoSalvarFatura(this,event);']").click()
-        driver.find_element_by_link_text("Money 2000+ (ofx)").click()
+        self.wait_and_find_element((By.XPATH,"//img[@title='PETROBRAS']")).click()
+        self.wait_and_find_element((By.XPATH,"//a[@onclick='$.criarCaixaDialogoSalvarFatura(this,event);']")).click()
+        self.wait_and_find_element((By.LINK_TEXT,"Money 2000+ (ofx)")).click()
+
+        print "Acessando a Poupança..."
+
+        # Baixar OFX da Poupanca
+        self.wait_and_find_element((By.XPATH,u"//a[@nome='Poupança']")).click()
+        self.wait_and_find_element((By.XPATH,"//a[@codigo='3909']")).click()
+        self.wait_and_find_element((By.PARTIAL_LINK_TEXT,"30 dias")).click()
+        self.wait_and_find_element((By.CSS_SELECTOR,"a.botaoToolBar.botaoToolBarSalvar")).click()
+        self.wait_and_find_element((By.LINK_TEXT,"Money 2000+ (ofx)")).click()
 
         print "Roubando seu dinheiro..."
         sleep(4)
@@ -121,6 +125,11 @@ class Teste(unittest.TestCase):
     def tearDown(self):
         self.driver.quit()
         self.assertEqual([], self.verificationErrors)
+
+    def wait_and_find_element(self, by):
+        delay = 30  # sec
+        WebDriverWait(self.driver, delay).until(EC.visibility_of_element_located(by))
+        return self.driver.find_element(*by)
 
 if __name__ == "__main__":
     unittest.main()

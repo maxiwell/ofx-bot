@@ -6,6 +6,7 @@ Caixa Econômica, Itaú, Santander e NuBank com aplicativos que aceitam o format
 
 #### ofx-bb:
 * Baixa o 'ofx' da conta corrente
+* Baixa o 'ofx' da poupança
 * Baixa o 'ofx' do cartão de crédito 'Petrobrás'
 
 #### ofx-caixa:
