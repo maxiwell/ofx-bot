@@ -1,5 +1,3 @@
 #!/usr/bin/env bash
-cabal sandbox init
-cabal install --only-dependencies
-cabal build
-cp ./dist/build/csv-nubank/csv-nubank ../
+stack build
+cp `stack path --dist-dir`/build/ofx-nubank/ofx-nubank ../

@@ -2,7 +2,7 @@ OFX-BOT
 =============
 
 Estes bots tem por objetivo automatizar a tarefa de conciliação bancária entre contas do Banco do Brasil,
-Caixa Econômica, Itaú e Santander com aplicativos que aceitam o formato 'ofx' (GNUCash, HomeBank.free.fr, Microsoft Money). 
+Caixa Econômica, Itaú, Santander e NuBank com aplicativos que aceitam o formato 'ofx' (GNUCash, HomeBank.free.fr, Microsoft Money). 
 
 #### ofx-bb:
 * Baixa o 'ofx' da conta corrente
@@ -17,8 +17,9 @@ Caixa Econômica, Itaú e Santander com aplicativos que aceitam o formato 'ofx' 
 #### ofx-santander:
 * Baixa o 'ofx' da conta corrente
 
-#### csv-nubank:
-* Baixa o 'csv' dos lançamentos da fatura atual
+#### ofx-nubank:
+* Baixa o 'ofx' dos lançamentos das faturas disponíveis. Também é capaz de gerar
+um CSV no formato aceito pelo HomeBank (Veja: ofx-nubank --help)
 
 
 Requisitos:
@@ -31,17 +32,13 @@ Requisitos:
 pip2 install selenium
 ```
 
-#### ofx-itau, csv-nubank
+#### ofx-itau, ofx-nubank
 
-* É necessário possuir um **haskell-platform** e um **cabal** recente em funcionamento.
+* É necessário ter o Haskell Stack instalado:
 
 ```bash
-apt-get install haskell-platform cabal-install
-cabal update
-cabal install cabal
+apt-get install stack
 ```
-
-* A última linha garante que você tenha a última versão do cabal instalada. Algumas distribuições ainda vêm com uma versão bem antiga.
 
 * Para compilar:
 
@@ -56,7 +53,7 @@ cd nubank
 ./build.sh
 ```
 
-* Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau/csv-nubank é automaticamente copiado para o diretório raiz do projeto.
+* Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau/ofx-nubank é automaticamente copiado para o diretório raiz do projeto.
 
 
 Como usar:
@@ -67,7 +64,7 @@ Como usar:
 ./ofx-caixa.py
 ./ofx-itau
 ./ofx-santander.py
-./csv-nubank
+./ofx-nubank
 ```
 Ou usando um aquivo de entrada, via redirecionamento:
 
@@ -76,7 +73,7 @@ Ou usando um aquivo de entrada, via redirecionamento:
 ./ofx-caixa.py < input.cfg
 ./ofx-itau < input.cfg
 ./ofx-santander.py < input.cfg
-./csv-nubank < input.cfg
+./ofx-nubank < input.cfg
 ```
 
 Nos casos acima, a janela do Firefox ficará visível durante toda a execução dos bots, pois não há 
