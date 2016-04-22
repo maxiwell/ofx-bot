@@ -8,7 +8,7 @@ maintainer:          francesquini@gmail.com
 build-type:          Simple
 cabal-version:       >=1.10
 
-executable csv-nubank
+executable ofx-nubank
   main-is:              Main.hs
   build-depends:        base >=4.8 && <4.9,
                         bytestring >=0.10,
