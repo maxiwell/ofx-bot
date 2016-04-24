@@ -38,7 +38,10 @@ pip2 install selenium
 * É necessário ter o Haskell Stack instalado:
 
 ```bash
-apt-get install stack
+wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+echo "deb http://download.fpcomplete.com/ubuntu/$(lsb_release -sc) stable main"|sudo tee /etc/apt/sources.list.d/fpco.list
+sudo apt-get update
+sudo apt-get install stack
 ```
 
 * Para compilar:
