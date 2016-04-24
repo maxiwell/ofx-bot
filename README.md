@@ -57,7 +57,8 @@ cd nubank
 ./build.sh
 ```
 
-* Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau/ofx-nubank é automaticamente copiado para o diretório raiz do projeto.
+* Caso a sua instalação de Haskell seja nova, o ``build.sh`` baixará e instalará uma série de pacotes no ``~/.stack``. Isso pode levar algum tempo. 
+Após compilado, os executáveis são automaticamente copiados para o diretório raiz do projeto.
 
 
 Como usar:
