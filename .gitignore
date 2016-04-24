@@ -3,7 +3,8 @@
 *.cfg
 *~
 ofx-itau
+ofx-nubank
 .tags
-selenium-server-standalone-2.46.0.jar
+selenium-server-standalone-*.jar
 csv-nubank
 
