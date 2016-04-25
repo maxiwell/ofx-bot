@@ -38,7 +38,10 @@ pip2 install selenium
 * É necessário ter o Haskell Stack instalado:
 
 ```bash
-apt-get install stack
+wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+echo "deb http://download.fpcomplete.com/ubuntu/$(lsb_release -sc) stable main"|sudo tee /etc/apt/sources.list.d/fpco.list
+sudo apt-get update
+sudo apt-get install stack
 ```
 
 * Para compilar:
@@ -54,7 +57,8 @@ cd nubank
 ./build.sh
 ```
 
-* Caso a sua instalação de Haskell seja nova, a compilação provavelmente instalará uma série de pacotes que precisarão ser baixados (automaticamente). Isso pode levar algum tempo. Após compilado, o executável ofx-itau/ofx-nubank é automaticamente copiado para o diretório raiz do projeto.
+* Caso a sua instalação de Haskell seja nova, o ``build.sh`` baixará e instalará uma série de pacotes no ``~/.stack``. Isso pode levar algum tempo. 
+Após compilado, os executáveis são automaticamente copiados para o diretório raiz do projeto.
 
 
 Como usar:

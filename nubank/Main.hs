@@ -323,7 +323,7 @@ checkAndDownloadSelenium fname = do
             B.writeFile fname bytes
             putStrLn "Download terminado"
     where
-        (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.46/selenium-server-standalone-2.46.0.jar"
+        (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.53/selenium-server-standalone-2.53.0.jar"
 
 startSeleniumServer :: IO ()
 startSeleniumServer = do
@@ -333,8 +333,8 @@ startSeleniumServer = do
         (_, _, Just st_err, _) <- createProcess (shell $ "java -jar " ++ fname){std_out = CreatePipe, std_err = CreatePipe}
         waitStart st_err
     where
-        -- hardcoded, por enquanto, com a versão 2.46
-        bname = "selenium-server-standalone-2.46.0.jar"
+        -- hardcoded, por enquanto, com a versão 2.53
+        bname = "selenium-server-standalone-2.53.0.jar"
         fullFilePath path = path ++ bname
         waitStart fstream = do
             ln <- hGetLine fstream
