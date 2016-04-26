@@ -323,7 +323,7 @@ checkAndDownloadSelenium fname = do
             B.writeFile fname bytes
             putStrLn "Download terminado"
     where
-        (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.53/selenium-server-standalone-2.53.0.jar"
+        (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.46/selenium-server-standalone-2.46.0.jar"
 
 startSeleniumServer :: IO ()
 startSeleniumServer = do
@@ -333,8 +333,8 @@ startSeleniumServer = do
         (_, _, Just st_err, _) <- createProcess (shell $ "java -jar " ++ fname){std_out = CreatePipe, std_err = CreatePipe}
         waitStart st_err
     where
-        -- hardcoded, por enquanto, com a versão 2.53
-        bname = "selenium-server-standalone-2.53.0.jar"
+        -- hardcoded, por enquanto, com a versão 2.46
+        bname = "selenium-server-standalone-2.46.0.jar"
         fullFilePath path = path ++ bname
         waitStart fstream = do
             ln <- hGetLine fstream
@@ -342,6 +342,7 @@ startSeleniumServer = do
 
 stopSeleniumServer :: IO ()
 stopSeleniumServer = do
+        putStrLn "Desligando Selenium Server"
         res <- simpleHTTP (defaultGETRequest_ url) >>= getResponseBody ::IO String
         assert (res == "OKOK") $ return ()
     where
@@ -359,6 +360,42 @@ generateOFX cpf dir fatura =
         putStrLn "Pegando OFX"
         hj <- today
         Tio.writeFile (combine dir fname)  (faturaToOFX fatura hj cpf)
+        
+getLoginInfo :: IO (String, String)
+getLoginInfo = do 
+    putStr "CPF: "
+    hFlush stdout
+    cpf <- getLine
+    putStr "Senha: "
+    hFlush stdout
+    senha <- withEcho False getLine
+    putChar '\n'
+    return (cpf, senha)
+
+nuBankScript :: String -> String -> FilePath -> [Flag] -> WD ()
+nuBankScript cpf senha dir flags = do
+    setImplicitWait 200
+    liftIO $ putStrLn "Efetuando login"
+    login cpf senha
+    f0 <- getFatura
+    let fatura = filter isValidTx f0
+    
+    when (CSV `elem` flags) $ 
+        liftIO (generateCSV cpf dir fatura)
+    when (null flags || OFX `elem` flags) $ 
+        liftIO (generateOFX cpf dir fatura)
+            
+    liftIO $ putStrLn "Deslogando"
+    logout
+    
+startSeleniumAndRun :: [Flag] -> IO ()
+startSeleniumAndRun flags = do
+    (cpf, senha) <- getLoginInfo
+    putStrLn "Iniciando Selenium Server"
+    startSeleniumServer
+    dir <- getCurrentDirectory
+    config <- myConfig dir
+    runSession config $ finallyClose $ nuBankScript cpf senha dir flags 
 
 main :: IO()
 main = do
@@ -367,34 +404,9 @@ main = do
     
     if Help `elem`flags || (length args /= length flags) then
         putStrLn usageString
-    else do
-        putStr "CPF: "
-        hFlush stdout
-        cpf <- getLine
-        putStr "Senha: "
-        hFlush stdout
-        senha <- withEcho False getLine
-        putChar '\n'
+    else
+        startSeleniumAndRun flags `catch` exHandler `finally` stopSeleniumServer
+        where 
+            exHandler :: SomeException -> IO ()
+            exHandler e = putStrLn $ "Erro durante a execução" ++ displayException e
 
-        putStrLn "Iniciando Selenium Server"
-        startSeleniumServer
-        dir <- getCurrentDirectory
-        config <- myConfig dir
-        runSession config $ do
-            setImplicitWait 200
-            liftIO $ putStrLn "Efetuando login"
-            login cpf senha
-            f0 <- getFatura
-            let fatura = filter isValidTx f0
-            
-            when (CSV `elem` flags) $ 
-                liftIO (generateCSV cpf dir fatura)
-            when (null flags || OFX `elem` flags) $ 
-                liftIO (generateOFX cpf dir fatura)
-                    
-            liftIO $ putStrLn "Deslogando"
-            logout
-            liftIO $ putStrLn "Fechando sessão Selenium"
-            closeSession
-        putStrLn "Desligando Selenium Server"
-        stopSeleniumServer
