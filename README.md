@@ -14,18 +14,35 @@ Caixa Econômica, Itaú, Santander e NuBank com aplicativos que aceitam o format
 
 #### ofx-itau:
 * Baixa o 'ofx' da conta corrente
+* Baixa o 'csv' da conta corrente
+* Baixa o 'csv' do cartão de crédito (contas com múltiplos cartões ainda não são suportadas)
+Roda no Chrome (default) ou Firefox (instável)
+Veja: "ofx-itau --help" para mais opções.
 
 #### ofx-santander:
 * Baixa o 'ofx' da conta corrente
 
 #### ofx-nubank:
 * Baixa o 'ofx' dos lançamentos das faturas disponíveis. Também é capaz de gerar
-um CSV no formato aceito pelo HomeBank (Veja: ofx-nubank --help)
-
+um CSV no formato aceito pelo HomeBank
+Roda no Chrome (default) ou Firefox (instável)
+Veja: "ofx-nubank --help" para mais opções.
 
 Requisitos:
 --------------
 
+#### Firefox ou Chrome 
+* As versões mais recentes do Firefox (>=47) e do Chrome não mais podem ser utilizadas diretamente com o cliente Selenium puro e exigem a instalação de um webdriver específico. Estes novos drivers (Firefox Marionette, Google Chrome Driver) precisam ser baixados e colocados em um diretório presente no PATH para funcionar.
+
+* Você pode achar a versão mais recente dos drivers aqui: http://www.seleniumhq.org/download/ . De qualquer forma, aqui vão os links diretos para facilitar a vida:
+
+- Firefox Marionette: https://github.com/mozilla/geckodriver/releases
+- Google Chrome Driver: http://chromedriver.storage.googleapis.com/index.html
+
+* No caso do Firefox Marionette, é preciso ainda renomear o executável baixado para `wires`
+
+* Mais informações: http://stackoverflow.com/questions/37761668/cant-open-browser-with-selenium-after-firefox-update
+ 
 #### ofx-bb, ofx-caixa e ofx-santander
 * É necessário ter o pacote **selenium** do Python2:
 
