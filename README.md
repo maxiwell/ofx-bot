@@ -34,14 +34,14 @@ Requisitos:
 --------------
 
 #### Firefox ou Chrome 
-* As versões mais recentes do Firefox (>=47) e do Chrome não mais podem ser utilizadas diretamente com o cliente Selenium puro e exigem a instalação de um webdriver específico. Estes novos drivers (Firefox Marionette, Google Chrome Driver) precisam ser baixados e colocados em um diretório presente no PATH para funcionar.
+* As versões mais recentes do Firefox (>=47) e do Chrome não mais podem ser utilizadas diretamente com o cliente Selenium puro e exigem a instalação de um webdriver específico. Estes novos drivers (Firefox GeckoDriver, Google Chrome Driver) precisam ser baixados e colocados em um diretório presente no PATH para funcionar.
 
 * Você pode achar a versão mais recente dos drivers aqui: http://www.seleniumhq.org/download/ . De qualquer forma, aqui vão os links diretos para facilitar a vida:
 
-- Firefox Marionette: https://github.com/mozilla/geckodriver/releases
+- Firefox GeckoDriver: https://github.com/mozilla/geckodriver/releases
 - Google Chrome Driver: http://chromedriver.storage.googleapis.com/index.html
 
-* No caso do Firefox Marionette, é preciso ainda renomear o executável baixado para `wires`
+* No caso do Firefox GeckoDriver, é preciso ainda renomear o executável baixado para `wires`
 
 * Mais informações: http://stackoverflow.com/questions/37761668/cant-open-browser-with-selenium-after-firefox-update
  
