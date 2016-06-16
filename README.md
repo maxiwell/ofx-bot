@@ -16,6 +16,7 @@ Caixa Econômica, Itaú, Santander e NuBank com aplicativos que aceitam o format
 * Baixa o 'ofx' da conta corrente
 * Baixa o 'csv' da conta corrente
 * Baixa o 'csv' do cartão de crédito (contas com múltiplos cartões ainda não são suportadas)
+
 Roda no Chrome (default) ou Firefox (instável)
 Veja: "ofx-itau --help" para mais opções.
 
@@ -25,6 +26,7 @@ Veja: "ofx-itau --help" para mais opções.
 #### ofx-nubank:
 * Baixa o 'ofx' dos lançamentos das faturas disponíveis. Também é capaz de gerar
 um CSV no formato aceito pelo HomeBank
+
 Roda no Chrome (default) ou Firefox (instável)
 Veja: "ofx-nubank --help" para mais opções.
 
