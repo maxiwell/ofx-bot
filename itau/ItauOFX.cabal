@@ -10,10 +10,12 @@ cabal-version:       >=1.10
 
 executable ofx-itau
   main-is:             Main.hs
-  build-depends:       base >=4.7,
-                       itau-lib >=0.2.0.1,
-                       webdriver >= 0.6,
+  build-depends:       base         >= 4.7,
+                       directory    >= 1.2,
+                       filepath     >= 1.4,
+                       itau-lib     >= 0.2.0.1,
+                       text         >= 1.2.2,
                        transformers >= 0.3,
-                       directory >= 1.2
+                       webdriver    >= 0.6
   ghc-options:         -O3 -Wall
   default-language:    Haskell2010
