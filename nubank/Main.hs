@@ -4,6 +4,7 @@ import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Data.Aeson.Types 
 import qualified Data.ByteString as B
 import qualified Data.Foldable as F
 import           Data.List
@@ -33,15 +34,21 @@ import           System.Console.GetOpt
 
 data Flag = OFX 
           | CSV
+          | Firefox
+          | Chrome
           | Help
     deriving (Eq, Show)
-          
+
 options :: [OptDescr Flag]
 options =
   [ Option ['o'] ["ofx", "OFX"] (NoArg OFX) 
         "Baixa as transações e salva no formato OFX (DEFAULT caso nenhuma opção seja especificada)"
   , Option ['c'] ["csv", "CSV"] (NoArg CSV) 
         "Baixa as transações e salva no formato CSV compatível com HomeBank"
+  , Option ['f'] ["ff", "firefox"] (NoArg Main.Firefox) 
+              "Utiliza o Firefox"
+  , Option ['C'] ["gc", "chrome"] (NoArg Main.Chrome) 
+              "Utiliza o Google Chrome (default)"              
   , Option ['h'] ["help"] (NoArg Help)
         "Imprime as opções do programa"
   ]
@@ -99,24 +106,23 @@ login cpf senha = do
     wait $ findElem (ById "input_001")   >>= sendKeys (T.pack senha) --senha
     wait $ findElem (ByXPath "//button[@type='submit']") >>= click
 
-logout :: WD()
-logout = do
-    wait $ findElem (ByCSS "a.logout") >>= click
-    liftIO $ sleep 5000 -- Aguarda alguns segundos para ter certeza que o logout terminou
-
 converteMes :: String -> Int 
 converteMes m = 
     1 + fromJust(elemIndex m meses)
     where
         meses = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
+
+getAno :: Day -> Integer
+getAno = sel1 . toGregorian
     
-converteData :: String -> WD (Maybe Day)
-converteData "" = return Nothing
-converteData str = do
-    hj <- liftIO today
-    return $ Just $ fromGregorian (sel1 $ toGregorian hj) (converteMes m) (read d)
+converteData :: Integer -> String -> WD (Maybe Day)
+converteData _   ""  = return Nothing
+converteData ano str = 
+    return $ Just $ fromGregorian ano mConvertido dConvertido
     where
         [d, m] = words str
+        mConvertido = converteMes m 
+        dConvertido = read d
 
 converteValor :: T.Text -> Float
 converteValor val =
@@ -228,24 +234,41 @@ faturaToOFX txs hj loginName =
             , "</OFX>"
             ]                      
 
-
-getTx :: String -> Element -> WD Tx
-getTx fat ele = do
-    dt0  <- wait $ findElemFrom ele (ByCSS "span.date.ng-binding") >>= getText
-    dtc   <- converteData $ T.unpack dt0 
+getTx ::  Integer -> Day -> String -> Element -> WD Tx
+getTx ano venc fat ele  = do
+    dt0 <- wait $ findElemFrom ele (ByCSS "span.date.ng-binding") >>= getText
+    dtc <- converteData ano $ T.unpack dt0
+    let dt = case dtc of Just dtc2 -> Just (if dtc2 > venc then addGregorianYearsClip (-1) dtc2 else dtc2)
+                         Nothing -> Nothing
     desc <- wait $ findElemFrom ele (ByCSS "div.description.ng-binding") >>= getText
     val  <- wait $ findElemFrom ele (ByCSS "div.amount.ng-binding") >>= getText
     return Tx {     
-        txData      = dtc,
+        txData      = dt,
         txDescricao = T.unpack desc,
         txValor     = negate $ converteValor val,
         txFatura    = fat    
     }
 
-getTxs :: String -> WD [Tx]
-getTxs venc = do
+getTxs ::  Integer -> Day -> String -> WD [Tx]
+getTxs ano vencDay venc = do
     tableLines <- wait $ findElems (ByCSS "div.charge.ng-scope")
-    mapM (getTx venc) tableLines
+    mapM (getTx ano vencDay venc) tableLines
+
+getVencimentoInicial :: WD Day
+getVencimentoInicial = do
+    hj <- liftIO today
+    let (y, m, _) = toGregorian hj
+    venc <- getVencimentoDay y
+    let (yv, mv, dv) = toGregorian venc -- qualquer ano só para começar
+    -- Se for menor, quer dizer que virou o ano, se for maior, é no mesmo ano
+    -- Este método assume que não existem parcelamentos no cartão acima de 12X
+    return $ fromGregorian (if mv > m then yv else yv + 1) mv dv
+
+getVencimentoDay :: Integer -> WD Day
+getVencimentoDay ano = do
+    venc <- getVencimento
+    dt0 <- converteData ano venc
+    return $ fromJust dt0
 
 getVencimento :: WD String 
 getVencimento = do 
@@ -256,16 +279,9 @@ getVencimento = do
     let vencFull = T.unpack venc1
     return $ case matchRegex regex vencFull of
         Nothing -> ""
-        Just ~[venc] -> "Venc. " ++ venc
+        Just ~[venc] -> venc
     where
         regex = mkRegex "Vencimento.+([0-9][0-9]+....)"
-
-getFaturaIx :: Element -> WD [Tx]
-getFaturaIx el = do
-    wait $ click el
-    liftIO $ sleep 1500
-    getVencimento >>= getTxs
-    
 
 getFaturaIxs :: Int -> [Element] -> WD [Element]
 getFaturaIxs ix acc = do
@@ -274,45 +290,69 @@ getFaturaIxs ix acc = do
         []   -> return acc
         [el] -> getFaturaIxs (ix + 1) (el:acc)
         _    -> error "should not be here"
-    
+
+getFaturaIx :: (Day, [Tx]) -> Element -> WD (Day, [Tx])
+getFaturaIx (vencBase, acc) el = do
+    wait $ click el
+    liftIO $ sleep 2000
+    venc <- getVencimento
+    dvenc <- getVencimentoDay $ getAno vencBase
+    liftIO $ putStrLn ("Obtendo Fatura com Vencimento: " ++ show dvenc)
+    txs <- getTxs (getAno vencBase) dvenc ("Venc. " ++ venc)
+    return (addGregorianMonthsClip (-1) vencBase, acc ++ txs)
 
 getFatura :: WD [Tx]
 getFatura = do
     wait $ findElem (ByCSS "a.menu-item.bills") >>= click -- Menu Faturas
     liftIO $ sleep 5000
     elems <- getFaturaIxs 2 []
-    txs <- mapM getFaturaIx elems
-    return $ concat txs
+    wait . click $ head elems
+    liftIO $ sleep 2000
+    vencBase <- getVencimentoInicial
+    (_, txs) <- F.foldlM getFaturaIx (vencBase, []) elems 
+    return txs
 
-myProfile :: String -> IO (PreparedProfile Firefox)
-myProfile dir =
+myFFProfile :: String -> IO (PreparedProfile Firefox)
+myFFProfile dir =
     prepareProfile $
-         addPref "browser.download.useDownloadDir"               True
-       $ addPref "browser.download.dir"                          dir
-       $ addPref "browser.download.folderList"                   (2 :: Integer)
-       $ addPref "browser.download.manager.alertOnEXEOpen"       False
-       $ addPref "browser.download.manager.closeWhenDone"        True
-       $ addPref "browser.download.manager.focusWhenStarting"    False
-       $ addPref "browser.download.manager.showAlertOnComplete"  False
-       $ addPref "browser.download.manager.showWhenStarting"     False
-       $ addPref "browser.download.manager.useWindow"            False
-       $ addPref "browser.download.panel.shown"                  False
-       $ addPref "browser.helperApps.alwaysAsk.force"            False
-       $ addPref "browser.helperApps.neverAsk.saveToDisk"        ("content/type,text/plain" :: String)
-       $ addPref "xpinstall.signatures.required"                 False
+         addPref "browser.download.useDownloadDir"              True
+       $ addPref "browser.download.dir"                         dir
+       $ addPref "browser.download.folderList"                  (2 :: Integer)
+       $ addPref "browser.download.manager.alertOnEXEOpen"      False
+       $ addPref "browser.download.manager.closeWhenDone"       True
+       $ addPref "browser.download.manager.focusWhenStarting"   False
+       $ addPref "browser.download.manager.showAlertOnComplete" False
+       $ addPref "browser.download.manager.showWhenStarting"    False
+       $ addPref "browser.download.manager.useWindow"           False
+       $ addPref "browser.download.panel.shown"                 False
+       $ addPref "browser.helperApps.alwaysAsk.force"           False
+       $ addPref "browser.helperApps.neverAsk.saveToDisk"       ("content/type,text/plain" :: String)
+       $ addPref "xpinstall.signatures.required"                False
+       -- $ addPref "webdriver.gecko.driver"                    ("PATH_TO_WIRES" :: String) 
          defaultProfile
 
 
-myConfig :: String -> IO WDConfig
-myConfig dir = do
-    pprof <- myProfile dir
-    return $ defaultConfig {
-        wdCapabilities = defaultCaps {
-            browser = firefox {
-                ffProfile = Just  pprof
+getConfig :: String -> [Flag] -> IO WDConfig
+getConfig dir flags  = 
+    if Main.Firefox `elem` flags then 
+        getFFConfig
+    else
+        getChromeConfig
+    where
+    getChromeConfig = return $ useBrowser chrome {
+            chromeOptions = ["--start-maximized"]
+        }
+        defaultConfig
+    getFFConfig = do         
+        pprof <- myFFProfile dir
+        return $ defaultConfig {
+            wdCapabilities = defaultCaps {
+                additionalCaps = [("marionette", Bool True)],
+                browser = firefox {
+                    ffProfile = Just  pprof
+                }
             }
         }
-    }
 
 checkAndDownloadSelenium :: FilePath -> IO ()
 checkAndDownloadSelenium fname = do
@@ -323,7 +363,7 @@ checkAndDownloadSelenium fname = do
             B.writeFile fname bytes
             putStrLn "Download terminado"
     where
-        (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.46/selenium-server-standalone-2.46.0.jar"
+        (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.53/selenium-server-standalone-2.53.0.jar"
 
 startSeleniumServer :: IO ()
 startSeleniumServer = do
@@ -333,8 +373,8 @@ startSeleniumServer = do
         (_, _, Just st_err, _) <- createProcess (shell $ "java -jar " ++ fname){std_out = CreatePipe, std_err = CreatePipe}
         waitStart st_err
     where
-        -- hardcoded, por enquanto, com a versão 2.46
-        bname = "selenium-server-standalone-2.46.0.jar"
+        -- hardcoded, por enquanto, com a versão 2.53
+        bname = "selenium-server-standalone-2.53.0.jar"
         fullFilePath path = path ++ bname
         waitStart fstream = do
             ln <- hGetLine fstream
@@ -351,13 +391,13 @@ stopSeleniumServer = do
 generateCSV :: String -> FilePath -> [Tx] -> IO()
 generateCSV cpf dir fatura =
     let fname = "nubank_" ++ cpf ++ ".csv" in do
-        putStrLn "Pegando CSV"
+        putStrLn "Gerando CSV"
         Tio.writeFile (combine dir fname) (faturaToCSV fatura)
 
 generateOFX :: String -> FilePath -> [Tx] -> IO()
 generateOFX cpf dir fatura =
     let fname = "nubank_" ++ cpf ++ ".ofx" in do
-        putStrLn "Pegando OFX"
+        putStrLn "Gerando OFX"
         hj <- today
         Tio.writeFile (combine dir fname)  (faturaToOFX fatura hj cpf)
         
@@ -375,6 +415,7 @@ getLoginInfo = do
 nuBankScript :: String -> String -> FilePath -> [Flag] -> WD ()
 nuBankScript cpf senha dir flags = do
     setImplicitWait 200
+    -- maximize
     liftIO $ putStrLn "Efetuando login"
     login cpf senha
     f0 <- getFatura
@@ -385,16 +426,17 @@ nuBankScript cpf senha dir flags = do
     when (null flags || OFX `elem` flags) $ 
         liftIO (generateOFX cpf dir fatura)
             
-    liftIO $ putStrLn "Deslogando"
-    logout
+    liftIO $ putStrLn "Arquivo gerado com sucesso."
+
     
 startSeleniumAndRun :: [Flag] -> IO ()
 startSeleniumAndRun flags = do
     (cpf, senha) <- getLoginInfo
     putStrLn "Iniciando Selenium Server"
     startSeleniumServer
+    putStrLn "Selenium Server Online"
     dir <- getCurrentDirectory
-    config <- myConfig dir
+    config <- getConfig dir flags
     runSession config $ finallyClose $ nuBankScript cpf senha dir flags 
 
 main :: IO()
