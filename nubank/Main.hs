@@ -293,8 +293,9 @@ getFaturaIxs ix acc = do
 
 getFaturaIx :: (Day, [Tx]) -> Element -> WD (Day, [Tx])
 getFaturaIx (vencBase, acc) el = do
+    scrollPrevious el
     wait $ click el
-    liftIO $ sleep 2000
+    liftIO $ sleep 1000
     venc <- getVencimento
     dvenc <- getVencimentoDay $ getAno vencBase
     liftIO $ putStrLn ("Obtendo Fatura com Vencimento: " ++ show dvenc)
@@ -306,12 +307,42 @@ getFatura = do
     wait $ findElem (ByCSS "a.menu-item.bills") >>= click -- Menu Faturas
     liftIO $ sleep 5000
     elems <- getFaturaIxs 2 []
-    wait . click $ head elems
-    liftIO $ sleep 2000
+    goToEnd $ head elems
     vencBase <- getVencimentoInicial
     (_, txs) <- F.foldlM getFaturaIx (vencBase, []) elems 
     return txs
 
+navigationButtons :: WD [Element]
+navigationButtons = do 
+    banner <- findElem $ ByXPath "/html/body/navigation-base/div[1]/div/main/section/bill-browser/div/md-tabs/section"
+    findElemsFrom banner (ByTag "button")
+
+scrollPrevious :: Element -> WD ()
+scrollPrevious l = do
+    dis <- isDisplayed l
+    unless dis $ do
+        elems <- navigationButtons
+        case elems of 
+            []  -> error "O botão da fatura procurada não esta visivel nem o previous"
+            (p:_) -> do
+                click p
+                liftIO $ sleep 1000
+
+goToEnd :: Element -> WD ()
+goToEnd l = do 
+    dis <- isDisplayed l
+    if dis then do
+        wait $ click l
+        liftIO $ sleep 1000
+    else do
+        elems <- navigationButtons
+        case elems of
+            []   -> error "O botão da fatura procurada não estava visivel nem o de navegacao"
+            _ -> do 
+                click $ last elems
+                liftIO $ sleep 1000
+                goToEnd l
+        
 myFFProfile :: String -> IO (PreparedProfile Firefox)
 myFFProfile dir =
     prepareProfile $
