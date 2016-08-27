@@ -7,4 +7,5 @@ ofx-nubank
 .tags
 selenium-server-standalone-*.jar
 csv-nubank
+ofx-bb
 
