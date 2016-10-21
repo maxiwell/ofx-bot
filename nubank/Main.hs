@@ -75,8 +75,8 @@ data Tx = Tx {
 fmtInt2 :: Int -> String
 fmtInt2 = printf "%02d"
 
-fmtInt3 :: Int -> String
-fmtInt3 = printf "%03d"
+fmtInt3Hex :: Int -> String
+fmtInt3Hex = printf "%03X"
 
 fmtDouble2 :: Float -> String
 fmtDouble2 = printf "%.2g"
@@ -285,7 +285,7 @@ getVencimento = do
 
 getFaturaIxs :: Int -> [Element] -> WD [Element]
 getFaturaIxs ix acc = do
-    elems <- findElems (ByCSS $ T.pack $ "#tab_" ++ fmtInt3 ix)
+    elems <- findElems (ByCSS $ T.pack $ "#tab_" ++ fmtInt3Hex ix)
     case elems of
         []   -> return acc
         [el] -> getFaturaIxs (ix + 1) (el:acc)
@@ -306,43 +306,49 @@ getFatura :: WD [Tx]
 getFatura = do
     wait $ findElem (ByCSS "a.menu-item.bills") >>= click -- Menu Faturas
     liftIO $ sleep 5000
+    goToEnd
     elems <- getFaturaIxs 2 []
-    goToEnd $ head elems
+    click $ head elems
     vencBase <- getVencimentoInicial
     (_, txs) <- F.foldlM getFaturaIx (vencBase, []) elems 
     return txs
 
-navigationButtons :: WD [Element]
+navigationButtons :: WD (Maybe Element, Maybe Element)
 navigationButtons = do 
     banner <- findElem $ ByXPath "/html/body/navigation-base/div[1]/div/main/section/bill-browser/div/md-tabs/section"
-    findElemsFrom banner (ByTag "button")
+    elems  <- findElemsFrom banner (ByTag "button")
+    case elems of 
+        [p, n] -> return (Just p, Just n)
+        [e]    -> do
+            hp <- isPrevious e
+            return $ if hp then (Just e, Nothing) else (Nothing, Just e)
+        []     -> return (Nothing, Nothing)
+        _      -> error "Numero de botões /= 0, 1 ou 2"
+    where
+        isPrevious :: Element -> WD Bool
+        isPrevious e = do
+            at <- attr e "class"
+            return $ fromJust at == "md-paginator md-prev ng-scope"
 
 scrollPrevious :: Element -> WD ()
 scrollPrevious l = do
     dis <- isDisplayed l
     unless dis $ do
-        elems <- navigationButtons
-        case elems of 
-            []  -> error "O botão da fatura procurada não esta visivel nem o previous"
-            (p:_) -> do
-                click p
-                liftIO $ sleep 1000
-
-goToEnd :: Element -> WD ()
-goToEnd l = do 
-    dis <- isDisplayed l
-    if dis then do
-        wait $ click l
+        (mp, _) <- navigationButtons
+        click $ fromMaybe (error "O botão da fatura procurada não esta visivel nem o previous") mp
         liftIO $ sleep 1000
-    else do
-        elems <- navigationButtons
-        case elems of
-            []   -> error "O botão da fatura procurada não estava visivel nem o de navegacao"
-            _ -> do 
-                click $ last elems
-                liftIO $ sleep 1000
-                goToEnd l
-        
+
+goToEnd :: WD ()
+goToEnd = do
+    (_, n) <- navigationButtons    
+    case n of
+        Nothing -> return ()
+        Just e  -> do
+            wait $ click e
+            liftIO $ sleep 1500
+            goToEnd 
+
+
 myFFProfile :: String -> IO (PreparedProfile Firefox)
 myFFProfile dir =
     prepareProfile $
