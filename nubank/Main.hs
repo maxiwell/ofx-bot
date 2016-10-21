@@ -309,6 +309,7 @@ getFatura = do
     goToEnd
     elems <- getFaturaIxs 2 []
     click $ head elems
+    liftIO $ sleep 1000
     vencBase <- getVencimentoInicial
     (_, txs) <- F.foldlM getFaturaIx (vencBase, []) elems 
     return txs
