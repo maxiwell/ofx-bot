@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 import           Control.Concurrent
 import           Control.Exception
@@ -37,7 +37,16 @@ data Flag = OFX
           | Firefox
           | Chrome
           | Help
+          | Limit Integer
     deriving (Eq, Show)
+    
+isLimitFlag :: Flag -> Bool
+isLimitFlag (Limit _) = True
+isLimitFlag _ = False
+
+fromLimit :: Flag -> Integer
+fromLimit (Limit x) = x
+fromLimit _ = error "fromLimit from something not a Limit"
 
 options :: [OptDescr Flag]
 options =
@@ -51,6 +60,8 @@ options =
               "Utiliza o Google Chrome (default)"              
   , Option ['h'] ["help"] (NoArg Help)
         "Imprime as opções do programa"
+  , Option ['l'] ["limite"] (ReqArg (Limit . read) "NumeroDeFaturas")
+        "Numero de faturas a retroagir" 
   ]
 
 usageString :: String
@@ -302,16 +313,18 @@ getFaturaIx (vencBase, acc) el = do
     txs <- getTxs (getAno vencBase) dvenc ("Venc. " ++ venc)
     return (addGregorianMonthsClip (-1) vencBase, acc ++ txs)
 
-getFatura :: WD [Tx]
-getFatura = do
+getFatura :: Integer -> WD [Tx]
+getFatura faturasARetroagir = do
     wait $ findElem (ByCSS "a.menu-item.bills") >>= click -- Menu Faturas
     liftIO $ sleep 5000
+    vencMin <- addGregorianMonthsClip (-faturasARetroagir) <$> getVencimentoInicial
     goToEnd
     elems <- getFaturaIxs 2 []
     click $ head elems
     liftIO $ sleep 1000
     vencBase <- getVencimentoInicial
-    (_, txs) <- F.foldlM getFaturaIx (vencBase, []) elems 
+    let nelems = fromIntegral . head $ dropWhile (\x -> vencMin <= addGregorianMonthsClip (-x) vencBase) [0..]
+    (_, txs) <- F.foldlM getFaturaIx (vencBase, []) (take nelems elems)
     return txs
 
 navigationButtons :: WD (Maybe Element, Maybe Element)
@@ -450,13 +463,19 @@ getLoginInfo = do
     putChar '\n'
     return (cpf, senha)
 
+-- O sistema de abas usa 3 digitos hexadecimais para numerar as faturas
+-- então 4096 é o maximo suportado
+getFaturasARetroagir :: [Flag] -> Integer
+getFaturasARetroagir fs =
+    fromMaybe 4096 $ fromLimit <$> find isLimitFlag fs
+
 nuBankScript :: String -> String -> FilePath -> [Flag] -> WD ()
 nuBankScript cpf senha dir flags = do
     setImplicitWait 200
     -- maximize
     liftIO $ putStrLn "Efetuando login"
     login cpf senha
-    f0 <- getFatura
+    f0 <- getFatura (getFaturasARetroagir flags)
     let fatura = filter isValidTx f0
     
     when (CSV `elem` flags) $ 
