@@ -10,6 +10,7 @@ import qualified Data.Foldable as F
 import           Data.List
 import           Data.Maybe
 import           Data.Char
+import           Data.Strings (strPadLeft)
 import qualified Data.Text as T
 import qualified Data.Text.IO as Tio
 import           Data.Time.Calendar
@@ -19,6 +20,7 @@ import           Data.Tuple.Select
 import           GHC.IO.Handle
 import           Network.HTTP
 import           Network.URI (parseURI)
+import           Numeric
 import           System.Directory
 import           System.FilePath
 import           System.Environment  
@@ -86,9 +88,12 @@ data Tx = Tx {
 fmtInt2 :: Int -> String
 fmtInt2 = printf "%02d"
 
-fmtInt3Hex :: Int -> String
-fmtInt3Hex = printf "%03X"
-
+fmtInt3Base36 :: Int -> String 
+fmtInt3Base36 n = 
+    strPadLeft (symbols 0) 3 (showIntAtBase 36 symbols n "")
+    where
+        symbols = (!!) (['0'..'9'] ++ ['A'..'Z'])
+        
 fmtDouble2 :: Float -> String
 fmtDouble2 = printf "%.2g"
 
@@ -296,7 +301,7 @@ getVencimento = do
 
 getFaturaIxs :: Int -> [Element] -> WD [Element]
 getFaturaIxs ix acc = do
-    elems <- findElems (ByCSS $ T.pack $ "#tab_" ++ fmtInt3Hex ix)
+    elems <- findElems (ByCSS $ T.pack $ "#tab_" ++ fmtInt3Base36 ix)
     case elems of
         []   -> return acc
         [el] -> getFaturaIxs (ix + 1) (el:acc)
@@ -405,16 +410,28 @@ getConfig dir flags  =
             }
         }
 
+seleniumServerVersion :: [String]
+seleniumServerVersion = ["2", "53", "1"]    
+
+seleniumServerFullVersion, seleniumServerShortVersion, seleniumServerJarName :: String
+seleniumServerFullVersion = intercalate "." seleniumServerVersion
+seleniumServerShortVersion = let (mj:mi:_) = seleniumServerVersion in mj ++ "." ++ mi
+seleniumServerJarName = "selenium-server-standalone-" ++ seleniumServerFullVersion ++ ".jar"
+
 checkAndDownloadSelenium :: FilePath -> IO ()
 checkAndDownloadSelenium fname = do
         fExists <- doesFileExist fname
         unless fExists $ do
             putStrLn "Selenium server não encontrado. Iniciando download..."
+            print url
             bytes <- simpleHTTP (defaultGETRequest_ url) >>= getResponseBody
             B.writeFile fname bytes
             putStrLn "Download terminado"
     where
-        (Just url) = parseURI "http://selenium-release.storage.googleapis.com/2.53/selenium-server-standalone-2.53.0.jar"
+        (Just url) = parseURI $ intercalate "/" [
+            "http://selenium-release.storage.googleapis.com",
+            seleniumServerShortVersion,
+            seleniumServerJarName]
 
 startSeleniumServer :: IO ()
 startSeleniumServer = do
@@ -424,9 +441,7 @@ startSeleniumServer = do
         (_, _, Just st_err, _) <- createProcess (shell $ "java -jar " ++ fname){std_out = CreatePipe, std_err = CreatePipe}
         waitStart st_err
     where
-        -- hardcoded, por enquanto, com a versão 2.53
-        bname = "selenium-server-standalone-2.53.0.jar"
-        fullFilePath path = path ++ bname
+        fullFilePath path = path ++ seleniumServerJarName
         waitStart fstream = do
             ln <- hGetLine fstream
             unless ("INFO - Selenium Server is up and running" `isSuffixOf` ln) $ waitStart fstream
