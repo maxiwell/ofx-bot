@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
-
 import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad
@@ -97,6 +95,9 @@ fmtInt3Base36 n =
 fmtDouble2 :: Float -> String
 fmtDouble2 = printf "%.2g"
 
+isBlank :: T.Text -> Bool
+isBlank = T.null . T.strip
+
 sleep :: Int -> IO()
 sleep msecs =
     threadDelay $ msecs * 1000
@@ -131,10 +132,10 @@ converteMes m =
 getAno :: Day -> Integer
 getAno = sel1 . toGregorian
     
-converteData :: Integer -> String -> WD (Maybe Day)
-converteData _   ""  = return Nothing
+converteData :: Integer -> String -> Maybe Day
+converteData _   ""  = Nothing
 converteData ano str = 
-    return $ Just $ fromGregorian ano mConvertido dConvertido
+    Just $ fromGregorian ano mConvertido dConvertido
     where
         [d, m] = words str
         mConvertido = converteMes m 
@@ -250,25 +251,34 @@ faturaToOFX txs hj loginName =
             , "</OFX>"
             ]                      
 
-getTx ::  Integer -> Day -> String -> Element -> WD Tx
-getTx ano venc fat ele  = do
-    dt0 <- wait $ findElemFrom ele (ByCSS "span.date.ng-binding") >>= getText
-    dtc <- converteData ano $ T.unpack dt0
-    let dt = case dtc of Just dtc2 -> Just (if dtc2 > venc then addGregorianYearsClip (-1) dtc2 else dtc2)
-                         Nothing -> Nothing
-    desc <- wait $ findElemFrom ele (ByCSS "div.description.ng-binding") >>= getText
-    val  <- wait $ findElemFrom ele (ByCSS "div.amount.ng-binding") >>= getText
-    return Tx {     
+parseTxLine :: Integer -> Day -> String -> String -> Maybe [String] -> Maybe Tx
+parseTxLine ano venc fat dt0 (Just [desc, val]) =
+    Just Tx {
         txData      = dt,
-        txDescricao = T.unpack desc,
-        txValor     = negate $ converteValor val,
-        txFatura    = fat    
+        txDescricao = desc,
+        txValor     = negate $ converteValor (T.pack val),
+        txFatura    = fat
     }
+    where
+        dt = (\e -> if e > venc then addGregorianYearsClip (-1) e else e) <$> converteData ano dt0
+parseTxLine _ _ _ _ _ = Nothing
+    
+convertTx :: Integer -> Day -> String -> T.Text -> Maybe Tx
+convertTx ano venc fat t
+    | isBlank t = Nothing
+    | otherwise = 
+        case lines $ T.unpack t of
+            [dt,tl] -> parseTxLine ano venc fat dt (regex tl)
+            _ -> Nothing
+        where
+            regex = matchRegex $ mkRegex "^(.*) (-?[0-9]+,[0-9]{2})$"
+
 
 getTxs ::  Integer -> Day -> String -> WD [Tx]
 getTxs ano vencDay venc = do
     tableLines <- wait $ findElems (ByCSS "div.charge.ng-scope")
-    mapM (getTx ano vencDay venc) tableLines
+    ls <- mapM getText tableLines
+    return $ mapMaybe (convertTx ano vencDay venc) ls
 
 getVencimentoInicial :: WD Day
 getVencimentoInicial = do
@@ -283,8 +293,7 @@ getVencimentoInicial = do
 getVencimentoDay :: Integer -> WD Day
 getVencimentoDay ano = do
     venc <- getVencimento
-    dt0 <- converteData ano venc
-    return $ fromJust dt0
+    return $ fromJust (converteData ano venc)
 
 getVencimento :: WD String 
 getVencimento = do 
@@ -478,8 +487,6 @@ getLoginInfo = do
     putChar '\n'
     return (cpf, senha)
 
--- O sistema de abas usa 3 digitos hexadecimais para numerar as faturas
--- então 4096 é o maximo suportado
 getFaturasARetroagir :: [Flag] -> Integer
 getFaturasARetroagir fs =
     fromMaybe 4096 $ fromLimit <$> find isLimitFlag fs
