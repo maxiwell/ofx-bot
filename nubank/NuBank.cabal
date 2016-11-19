@@ -19,7 +19,7 @@ executable ofx-nubank
                         HTTP >=4000.2,
                         network-uri >=2.5,
                         process >=1.2,
-                        regex-compat >=0.95,
+                        regex-compat-tdfa >=0.95,
                         strings >= 1.1,
                         text >=1.1,
                         time >=1.4,

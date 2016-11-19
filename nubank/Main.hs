@@ -206,8 +206,7 @@ faturaToOFX txs hj loginName =
               , "DATA:OFXSGML"
               , "VERSION:102"
               , "SECURITY:NONE"
-              , "ENCODING:USASCII"
-              , "CHARSET:1252"
+              , "ENCODING:UTF-8"
               , "COMPRESSION:NONE"
               , "OLDFILEUID:NONE"
               , "NEWFILEUID:NONE"
@@ -252,7 +251,7 @@ faturaToOFX txs hj loginName =
             ]                      
 
 parseTxLine :: Integer -> Day -> String -> String -> Maybe [String] -> Maybe Tx
-parseTxLine ano venc fat dt0 (Just [desc, val]) =
+parseTxLine ano venc fat dt0 (Just [desc, val, _]) =
     Just Tx {
         txData      = dt,
         txDescricao = desc,
@@ -271,7 +270,7 @@ convertTx ano venc fat t
             [dt,tl] -> parseTxLine ano venc fat dt (regex tl)
             _ -> Nothing
         where
-            regex = matchRegex $ mkRegex "^(.*) (-?[0-9]+,[0-9]{2})$"
+            regex = matchRegex $ mkRegex "^(.*) (-?([0-9]+\\.)*[0-9]+,[0-9]{2})$"
 
 
 getTxs ::  Integer -> Day -> String -> WD [Tx]
