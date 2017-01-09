@@ -89,23 +89,23 @@ class BB():
 
         # Resolvendo janela de codigo
         try:
-            driver.find_element_by_xpath("//a[@title='Fechar']").click()
+            self.wait_and_find_element((By.XPATH,"//a[@title='Fechar']"), 10).click()
         except: pass 
 
         print "Acessando a Conta Corrente..."
 
         # Baixar OFX da Conta Corrente
-        driver.find_element_by_css_selector("li.saldo-texto").click()
-        driver.find_element_by_partial_link_text("30 dias").click()
-        driver.find_element_by_css_selector("a.botaoToolBar.botaoToolBarSalvar").click()
-        driver.find_element_by_link_text("Money 2000+ (ofx)").click()
+        self.wait_and_find_element((By.CSS_SELECTOR, "li.saldo-texto")).click()
+        self.wait_and_find_element((By.PARTIAL_LINK_TEXT, "30 dias")).click()
+        self.wait_and_find_element((By.CSS_SELECTOR, "a.botaoToolBar.botaoToolBarSalvar")).click()
+        self.wait_and_find_element((By.LINK_TEXT, "Money 2000+ (ofx)")).click()
+        sleep(1)
 
         print "Acessando o Cartao de Credito..."
 
         # Baixar OFX do Cartao Petrobras
-        self.wait_and_find_element((By.XPATH,u"//a[@nome='Cartões']")).click()
-        self.wait_and_find_element((By.XPATH,"//a[@codigo='3580']")).click()
-        sleep(2)
+        self.wait_and_find_element((By.XPATH,u"//li[@tipoextrato='2']")).click()
+        sleep(1)
         self.wait_and_find_element((By.XPATH,"//img[@title='PETROBRAS']")).click()
         self.wait_and_find_element((By.XPATH,"//a[@onclick='$.criarCaixaDialogoSalvarFatura(this,event);']")).click()
         self.wait_and_find_element((By.LINK_TEXT,"Money 2000+ (ofx)")).click()
@@ -113,42 +113,21 @@ class BB():
         print "Acessando a Poupança..."
 
         # Baixar OFX da Poupanca
-        self.wait_and_find_element((By.XPATH,u"//a[@nome='Poupança']")).click()
-        self.wait_and_find_element((By.XPATH,"//a[@codigo='3909']")).click()
-        self.wait_and_find_element((By.PARTIAL_LINK_TEXT,"30 dias")).click()
+        self.wait_and_find_element((By.XPATH,u"//li[@tipoextrato='3']")).click()
+        while True: 
+            try: 
+                driver.find_element_by_partial_link_text("30 dias").click()
+                break
+            except:
+                driver.find_element_by_xpath(u"//li[@class='ui-state-default ui-tabs-paging-next']").click()
+                sleep(1)
         self.wait_and_find_element((By.CSS_SELECTOR,"a.botaoToolBar.botaoToolBarSalvar")).click()
         self.wait_and_find_element((By.LINK_TEXT,"Money 2000+ (ofx)")).click()
 
         print "Roubando seu dinheiro..."
         sleep(4)
 
-    def is_element_present(self, how, what):
-        try: self.driver.find_element(by=how, value=what)
-        except NoSuchElementException, e: return False
-        return True
-   
-    def is_alert_present(self):
-        try: self.driver.switch_to_alert()
-        except NoAlertPresentException, e: return False
-        return True
-    
-    def close_alert_and_get_its_text(self):
-        try:
-            alert = self.driver.switch_to_alert()
-            alert_text = alert.text
-            if self.accept_next_alert:
-                alert.accept()
-            else:
-                alert.dismiss()
-            return alert_text
-        finally: self.accept_next_alert = True
-    
-    def tearDown(self):
-        self.driver.quit()
-        self.assertEqual([], self.verificationErrors)
-
-    def wait_and_find_element(self, by):
-        delay = 30  # sec
+    def wait_and_find_element(self, by, delay=30):
         WebDriverWait(self.driver, delay).until(EC.visibility_of_element_located(by))
         return self.driver.find_element(*by)
 
