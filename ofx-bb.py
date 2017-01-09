@@ -10,20 +10,47 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import NoAlertPresentException
 
 from time import sleep
-import unittest, time, re
+import time, re
 import subprocess, signal
 import getpass
-import sys
-import os
-import traceback
+import sys, traceback
+import os, urllib, tarfile, zipfile
 
 class BB():
 
     def startSelenium(self):
-        print "Start Selenium"
         dirroot = os.path.dirname(os.path.realpath(sys.argv[0]))
-        FNULL = open("/tmp/selenium.log", 'w')
-        cmd  = 'java -jar ' + dirroot + '/selenium-server-standalone-3.0.1.jar'
+        seleniumlog = os.path.join(dirroot, "selenium.log")
+        selenium = "selenium-server-standalone-3.0.1.jar"
+        seleniumjar = os.path.join(dirroot, selenium)
+        geckodriver = os.path.join(dirroot, 'geckodriver')
+
+        print "Start Selenium (log: " + seleniumlog + ")"
+        FNULL = open(seleniumlog, 'w')
+
+        if not os.path.isfile(seleniumjar):
+            urllib.urlretrieve('http://selenium-release.storage.googleapis.com/3.0/selenium-server-standalone-3.0.1.jar', seleniumjar)
+
+        if not os.path.isfile(geckodriver):
+            if sys.platform.startswith('linux'):
+                urllib.urlretrieve('https://github.com/mozilla/geckodriver/releases/download/v0.13.0/geckodriver-v0.13.0-linux64.tar.gz', geckodriver + '.tar.gz')
+                tar = tarfile.open(geckodriver + '.tar.gz')
+                tar.extractall(dirroot)
+                tar.close()
+            elif sys.platform.startswith('win'):
+                #FIXME: Not tested! I don't have windows.
+                urllib.urlretrieve('https://github.com/mozilla/geckodriver/releases/download/v0.13.0/geckodriver-v0.13.0-win64.zip', geckodriver + '.zip')
+                zf = zipfile.ZipFile(geckodriver + '.zip')
+                zf.extractall(dirroot)
+                zr.close()
+            else:
+                print 'Platform ' + sys.platform + ' not supported yet'
+                sys.exit(1)
+       
+        cmd  = 'java -jar ' + seleniumjar
+        os.environ["PATH"] += os.pathsep + dirroot
+        
+        #FIXME: Is it works on Windows? 
         self.process = subprocess.Popen(cmd, shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
         sleep(3);
 
