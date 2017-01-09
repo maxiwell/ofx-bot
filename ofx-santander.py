@@ -9,10 +9,10 @@ from selenium.common.exceptions import NoAlertPresentException
 from time import sleep
 import unittest, time, re
 import getpass
-import sys
+import sys, traceback
 import os
 
-class Teste(unittest.TestCase):
+class Santander():
 
     def setUp(self):
 
@@ -47,7 +47,7 @@ class Teste(unittest.TestCase):
         self.verificationErrors = []
         self.accept_next_alert = True
     
-    def test_e(self):
+    def connecting(self):
 
         driver = self.driver
         driver.get(self.base_url + "/")
@@ -120,4 +120,9 @@ class Teste(unittest.TestCase):
         self.assertEqual([], self.verificationErrors)
 
 if __name__ == "__main__":
-    unittest.main()
+    santander = Santander()
+    try:
+        santander.setUp()
+        santander.connecting()
+    except Exception as e:
+        traceback.print_exc()
