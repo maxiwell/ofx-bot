@@ -56,7 +56,7 @@ class BB():
 
     def stopSelenium(self):
         print "Stop Selenium"
-        os.killpg(os.getpgid(self.process.pid), signal.SIGTERM) 
+        self.driver.quit()
 
     def setUp(self):
 
