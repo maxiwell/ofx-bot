@@ -96,6 +96,7 @@ class BB():
                         desired_capabilities=cap)
 
         self.driver.implicitly_wait(30)
+        self.driver.maximize_window()
         self.base_url = "https://www2.bancobrasil.com.br/"
         self.verificationErrors = []
         self.accept_next_alert = True
