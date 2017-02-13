@@ -501,7 +501,7 @@ nuBankScript cpf senha dir flags = do
     
     when (CSV `elem` flags) $ 
         liftIO (generateCSV cpf dir fatura)
-    when (null flags || OFX `elem` flags) $ 
+    when (OFX `elem` flags || CSV `notElem` flags) $ 
         liftIO (generateOFX cpf dir fatura)
             
     liftIO $ putStrLn "Arquivo gerado com sucesso."
@@ -528,5 +528,5 @@ main = do
         startSeleniumAndRun flags `catch` exHandler `finally` stopSeleniumServer
         where 
             exHandler :: SomeException -> IO ()
-            exHandler e = putStrLn $ "Erro durante a execução" ++ displayException e
+            exHandler e = putStrLn $ "Erro durante a execução: " ++ displayException e
 
