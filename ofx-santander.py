@@ -6,13 +6,55 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import NoAlertPresentException
-from time import sleep
-import unittest, time, re
-import getpass
-import sys
-import os
 
-class Teste(unittest.TestCase):
+from time import sleep
+import time, re
+import subprocess, signal
+import getpass
+import sys, traceback
+import os, urllib, tarfile, zipfile
+
+class Santander():
+
+    def startSelenium(self):
+        dirroot = os.path.dirname(os.path.realpath(sys.argv[0]))
+        seleniumlog = os.path.join(dirroot, "selenium.log")
+        selenium = "selenium-server-standalone-3.0.1.jar"
+        seleniumjar = os.path.join(dirroot, selenium)
+        geckodriver = os.path.join(dirroot, 'geckodriver')
+
+        print "Start Selenium (log: " + seleniumlog + ")"
+        FNULL = open(seleniumlog, 'w')
+
+        if not os.path.isfile(seleniumjar):
+            urllib.urlretrieve('http://selenium-release.storage.googleapis.com/3.0/selenium-server-standalone-3.0.1.jar', seleniumjar)
+
+        if not os.path.isfile(geckodriver):
+            if sys.platform.startswith('linux'):
+                urllib.urlretrieve('https://github.com/mozilla/geckodriver/releases/download/v0.13.0/geckodriver-v0.13.0-linux64.tar.gz', geckodriver + '.tar.gz')
+                tar = tarfile.open(geckodriver + '.tar.gz')
+                tar.extractall(dirroot)
+                tar.close()
+            elif sys.platform.startswith('win'):
+                #FIXME: Not tested! I don't have windows.
+                urllib.urlretrieve('https://github.com/mozilla/geckodriver/releases/download/v0.13.0/geckodriver-v0.13.0-win64.zip', geckodriver + '.zip')
+                zf = zipfile.ZipFile(geckodriver + '.zip')
+                zf.extractall(dirroot)
+                zr.close()
+            else:
+                print 'Platform ' + sys.platform + ' not supported yet'
+                sys.exit(1)
+       
+        cmd  = 'java -jar ' + seleniumjar
+        os.environ["PATH"] += os.pathsep + dirroot
+        
+        #FIXME: Is it works on Windows? 
+        self.process = subprocess.Popen(cmd, shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
+        sleep(3);
+
+    def stopSelenium(self):
+        print "Stop Selenium"
+        self.driver.quit()
 
     def setUp(self):
 
@@ -39,15 +81,21 @@ class Teste(unittest.TestCase):
         self.myprofile.set_preference('browser.download.manager.showAlertOnComplete', False)
         self.myprofile.set_preference('browser.download.manager.useWindow', False)
         self.myprofile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'multipart/form-data' )
-        self.myprofile.update_preferences()
 
-        self.driver = webdriver.Firefox(firefox_profile=self.myprofile)
+        cap = webdriver.DesiredCapabilities.FIREFOX
+        cap["marionette"] = True;
+        self.driver = webdriver.Remote(
+                        command_executor='http://127.0.0.1:4444/wd/hub',
+                        browser_profile=self.myprofile,
+                        desired_capabilities=cap)
+        
         self.driver.implicitly_wait(30)
+        self.driver.maximize_window()
         self.base_url = "http://www.santander.com.br/"
         self.verificationErrors = []
         self.accept_next_alert = True
     
-    def test_e(self):
+    def connecting(self):
 
         driver = self.driver
         driver.get(self.base_url + "/")
@@ -74,50 +122,42 @@ class Teste(unittest.TestCase):
         driver.find_element_by_id("txtSenha").send_keys(self.password)
         driver.find_element_by_link_text("continuar").click()
 
-#        sleep(2)
+        sleep(2)
         driver.switch_to_default_content()
         driver.switch_to_frame("Principal")
         driver.switch_to_frame("Menu")
         driver.find_element_by_partial_link_text("Corrente").click()
 
-#        sleep(2)
+        sleep(2)
         driver.switch_to_default_content()
         driver.switch_to_frame("Principal")
         driver.switch_to_frame("Corpo")
-        driver.find_element_by_link_text(u"Extrato (Últimos 30 dias)").click()
+        driver.find_element_by_partial_link_text(u"30 dias").click()
 
-        sleep(4)
+        sleep(1)
         driver.switch_to_frame("iframePrinc")
-        driver.find_element_by_link_text(u"exportar").click()
+        sleep(2)
+        driver.find_element_by_link_text("exportar").click()
+        sleep(1)
         driver.find_element_by_id("tipo3").click()
         driver.find_element_by_link_text("confirmar").click()
-        sleep(5)
+        sleep(3)
 
-
-    def is_element_present(self, how, what):
-        try: self.driver.find_element(by=how, value=what)
-        except NoSuchElementException, e: return False
-        return True
-   
-    def is_alert_present(self):
-        try: self.driver.switch_to_alert()
-        except NoAlertPresentException, e: return False
-        return True
-    
-    def close_alert_and_get_its_text(self):
-        try:
-            alert = self.driver.switch_to_alert()
-            alert_text = alert.text
-            if self.accept_next_alert:
-                alert.accept()
-            else:
-                alert.dismiss()
-            return alert_text
-        finally: self.accept_next_alert = True
-    
-    def tearDown(self):
-        self.driver.quit()
-        self.assertEqual([], self.verificationErrors)
+def signal_handler(signal, frame):
+    sys.exit(0)
 
 if __name__ == "__main__":
-    unittest.main()
+
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    santander = Santander()
+
+    santander.startSelenium()
+    try:
+        santander.setUp()
+        santander.connecting()
+        santander.stopSelenium()
+    except Exception as e:
+        traceback.print_exc()
+        santander.stopSelenium()
+

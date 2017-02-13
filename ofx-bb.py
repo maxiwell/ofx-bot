@@ -10,12 +10,53 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import NoAlertPresentException
 
 from time import sleep
-import unittest, time, re
+import time, re
+import subprocess, signal
 import getpass
-import sys
-import os
+import sys, traceback
+import os, urllib, tarfile, zipfile
 
-class Teste(unittest.TestCase):
+class BB():
+
+    def startSelenium(self):
+        dirroot = os.path.dirname(os.path.realpath(sys.argv[0]))
+        seleniumlog = os.path.join(dirroot, "selenium.log")
+        selenium = "selenium-server-standalone-3.0.1.jar"
+        seleniumjar = os.path.join(dirroot, selenium)
+        geckodriver = os.path.join(dirroot, 'geckodriver')
+
+        print "Start Selenium (log: " + seleniumlog + ")"
+        FNULL = open(seleniumlog, 'w')
+
+        if not os.path.isfile(seleniumjar):
+            urllib.urlretrieve('http://selenium-release.storage.googleapis.com/3.0/selenium-server-standalone-3.0.1.jar', seleniumjar)
+
+        if not os.path.isfile(geckodriver):
+            if sys.platform.startswith('linux'):
+                urllib.urlretrieve('https://github.com/mozilla/geckodriver/releases/download/v0.13.0/geckodriver-v0.13.0-linux64.tar.gz', geckodriver + '.tar.gz')
+                tar = tarfile.open(geckodriver + '.tar.gz')
+                tar.extractall(dirroot)
+                tar.close()
+            elif sys.platform.startswith('win'):
+                #FIXME: Not tested! I don't have windows.
+                urllib.urlretrieve('https://github.com/mozilla/geckodriver/releases/download/v0.13.0/geckodriver-v0.13.0-win64.zip', geckodriver + '.zip')
+                zf = zipfile.ZipFile(geckodriver + '.zip')
+                zf.extractall(dirroot)
+                zr.close()
+            else:
+                print 'Platform ' + sys.platform + ' not supported yet'
+                sys.exit(1)
+       
+        cmd  = 'java -jar ' + seleniumjar
+        os.environ["PATH"] += os.pathsep + dirroot
+        
+        #FIXME: Is it works on Windows? 
+        self.process = subprocess.Popen(cmd, shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
+        sleep(3);
+
+    def stopSelenium(self):
+        print "Stop Selenium"
+        self.driver.quit()
 
     def setUp(self):
 
@@ -46,13 +87,21 @@ class Teste(unittest.TestCase):
         self.myprofile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'text/ofx,text/plain' )
         self.myprofile.update_preferences()
 
-        self.driver = webdriver.Firefox(firefox_profile=self.myprofile)
+
+        cap = webdriver.DesiredCapabilities.FIREFOX
+        cap["marionette"] = True;
+        self.driver = webdriver.Remote(
+                        command_executor='http://127.0.0.1:4444/wd/hub',
+                        browser_profile=self.myprofile,
+                        desired_capabilities=cap)
+
         self.driver.implicitly_wait(30)
+        self.driver.maximize_window()
         self.base_url = "https://www2.bancobrasil.com.br/"
         self.verificationErrors = []
         self.accept_next_alert = True
     
-    def test_e(self):
+    def connecting(self):
 
 
         print "Conectando ao site do BB..."
@@ -68,23 +117,23 @@ class Teste(unittest.TestCase):
 
         # Resolvendo janela de codigo
         try:
-            driver.find_element_by_xpath("//a[@title='Fechar']").click()
+            self.wait_and_find_element((By.XPATH,"//a[@title='Fechar']"), 10).click()
         except: pass 
 
         print "Acessando a Conta Corrente..."
 
         # Baixar OFX da Conta Corrente
-        driver.find_element_by_css_selector("li.saldo-texto").click()
-        driver.find_element_by_partial_link_text("30 dias").click()
-        driver.find_element_by_css_selector("a.botaoToolBar.botaoToolBarSalvar").click()
-        driver.find_element_by_link_text("Money 2000+ (ofx)").click()
+        self.wait_and_find_element((By.CSS_SELECTOR, "li.saldo-texto")).click()
+        self.wait_and_find_element((By.PARTIAL_LINK_TEXT, "30 dias")).click()
+        self.wait_and_find_element((By.CSS_SELECTOR, "a.botaoToolBar.botaoToolBarSalvar")).click()
+        self.wait_and_find_element((By.LINK_TEXT, "Money 2000+ (ofx)")).click()
+        sleep(1)
 
         print "Acessando o Cartao de Credito..."
 
         # Baixar OFX do Cartao Petrobras
-        self.wait_and_find_element((By.XPATH,u"//a[@nome='Cartões']")).click()
-        self.wait_and_find_element((By.XPATH,"//a[@codigo='3580']")).click()
-        sleep(2)
+        self.wait_and_find_element((By.XPATH,u"//li[@tipoextrato='2']")).click()
+        sleep(1)
         self.wait_and_find_element((By.XPATH,"//img[@title='PETROBRAS']")).click()
         self.wait_and_find_element((By.XPATH,"//a[@onclick='$.criarCaixaDialogoSalvarFatura(this,event);']")).click()
         self.wait_and_find_element((By.LINK_TEXT,"Money 2000+ (ofx)")).click()
@@ -92,44 +141,40 @@ class Teste(unittest.TestCase):
         print "Acessando a Poupança..."
 
         # Baixar OFX da Poupanca
-        self.wait_and_find_element((By.XPATH,u"//a[@nome='Poupança']")).click()
-        self.wait_and_find_element((By.XPATH,"//a[@codigo='3909']")).click()
-        self.wait_and_find_element((By.PARTIAL_LINK_TEXT,"30 dias")).click()
+        self.wait_and_find_element((By.XPATH,u"//li[@tipoextrato='3']")).click()
+        while True: 
+            try: 
+                driver.find_element_by_partial_link_text("30 dias").click()
+                break
+            except:
+                driver.find_element_by_xpath(u"//li[@class='ui-state-default ui-tabs-paging-next']").click()
+                sleep(1)
         self.wait_and_find_element((By.CSS_SELECTOR,"a.botaoToolBar.botaoToolBarSalvar")).click()
         self.wait_and_find_element((By.LINK_TEXT,"Money 2000+ (ofx)")).click()
 
         print "Roubando seu dinheiro..."
         sleep(4)
 
-    def is_element_present(self, how, what):
-        try: self.driver.find_element(by=how, value=what)
-        except NoSuchElementException, e: return False
-        return True
-   
-    def is_alert_present(self):
-        try: self.driver.switch_to_alert()
-        except NoAlertPresentException, e: return False
-        return True
-    
-    def close_alert_and_get_its_text(self):
-        try:
-            alert = self.driver.switch_to_alert()
-            alert_text = alert.text
-            if self.accept_next_alert:
-                alert.accept()
-            else:
-                alert.dismiss()
-            return alert_text
-        finally: self.accept_next_alert = True
-    
-    def tearDown(self):
-        self.driver.quit()
-        self.assertEqual([], self.verificationErrors)
-
-    def wait_and_find_element(self, by):
-        delay = 30  # sec
+    def wait_and_find_element(self, by, delay=30):
         WebDriverWait(self.driver, delay).until(EC.visibility_of_element_located(by))
         return self.driver.find_element(*by)
 
+
+def signal_handler(signal, frame):
+    sys.exit(0)
+
 if __name__ == "__main__":
-    unittest.main()
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    bb = BB()
+
+    bb.startSelenium()
+    try:
+        bb.setUp()
+        bb.connecting()
+        bb.stopSelenium()
+    except Exception as e:
+        traceback.print_exc()
+        bb.stopSelenium()
+
